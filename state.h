@@ -91,9 +91,96 @@ private:
     const State mState;
 };
 
+class Keyboard {
+public:
+    Keyboard() {
+        mLetters.push_back(Letter('q'));
+        mLetters.push_back(Letter('w'));
+        mLetters.push_back(Letter('e'));
+        mLetters.push_back(Letter('r'));
+        mLetters.push_back(Letter('t'));
+        mLetters.push_back(Letter('y'));
+        mLetters.push_back(Letter('u'));
+        mLetters.push_back(Letter('i'));
+        mLetters.push_back(Letter('o'));
+        mLetters.push_back(Letter('p'));
+        mLetters.push_back(Letter('a'));
+        mLetters.push_back(Letter('s'));
+        mLetters.push_back(Letter('d'));
+        mLetters.push_back(Letter('f'));
+        mLetters.push_back(Letter('g'));
+        mLetters.push_back(Letter('h'));
+        mLetters.push_back(Letter('j'));
+        mLetters.push_back(Letter('k'));
+        mLetters.push_back(Letter('l'));
+        mLetters.push_back(Letter('z'));
+        mLetters.push_back(Letter('x'));
+        mLetters.push_back(Letter('c'));
+        mLetters.push_back(Letter('v'));
+        mLetters.push_back(Letter('b'));
+        mLetters.push_back(Letter('n'));
+        mLetters.push_back(Letter('m'));
+    }
+
+    Keyboard(const Keyboard &other)
+        : mLetters(other.mLetters) { }
+
+    Keyboard updateWithGuess(const std::string &guess, const Match &match) const {
+        std::vector<const Letter> updated_keyboard;
+        for (auto letter : mLetters) {
+            auto ofs = guess.find(letter.value());
+            if (ofs == std::string::npos) {
+                updated_keyboard.push_back(letter);
+            }
+            else {
+                Match::Value v = match.value_at(ofs);
+                updated_keyboard.push_back(Letter(letter, v == Match::kAbsent ? Letter::kAbsent : Letter::kPresent));
+            }
+        }
+        return Keyboard(updated_keyboard);
+    }
+
+    const Letter &letter(char c) const {
+        auto it = std::find_if(mLetters.begin(), mLetters.end(), [c](const Letter &l) { return l.value() == c; } );
+        assert(it != mLetters.end());
+        return *it;
+    }
+
+    void print() const {
+        for (auto letter : mLetters) {
+            switch (letter.state()) {
+                case Letter::kAbsent:
+                    std::cout << "⬛️";
+                    break;
+                case Letter::kPresent:
+                    std::cout << "🟨";
+                    break;
+                case Letter::kUntested:
+                    std::cout << "⬜️";
+                    break;
+            }
+            std::cout << letter.value();
+            if (letter.value() == 'p') {
+                std::cout << std::endl << "  ";
+            } else if (letter.value() == 'l') {
+                std::cout << std::endl << "     ";
+            } else {
+                std::cout << " ";
+            }
+        }
+        std::cout << std::endl;
+    }
+
+private:
+    Keyboard(const std::vector<const Letter> &letters)
+        :mLetters(letters) { }
+
+    std::vector<const Letter> mLetters;
+};
+
 class ScoredEntropy {
 public:
-    ScoredEntropy(const WordEntropy &entropy, const std::vector<const Letter> &keyboard);
+    ScoredEntropy(const WordEntropy &entropy, const Keyboard &keyboard);
 
     inline WordEntropy entropy() const {
         return mEntropy;
@@ -129,7 +216,7 @@ public:
     void best_guess() const;
 
 private:
-    State(ThreadPool &pool, const std::vector<const Word> &all_words, int generation, const std::vector<const Word> &words, const std::vector<const Letter> &keyboard, bool do_print = true);
+    State(ThreadPool &pool, const std::vector<const Word> &all_words, int generation, const std::vector<const Word> &words, const Keyboard &keyboard, bool do_print = true);
 
     double compute_entropy(const std::string &word) const;
     double compute_entropy2(const std::string &word) const;
@@ -145,5 +232,5 @@ private:
     std::vector<WordEntropy> mEntropy;
     std::vector<WordEntropy> mEntropy2;
 
-    std::vector<const Letter> mKeyboard;
+    Keyboard mKeyboard;
 };

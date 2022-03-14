@@ -33,14 +33,10 @@ State::State(ThreadPool &pool, const std::vector<const Word> &all_words)
 
     mNSolutions = std::transform_reduce(mWords.begin(), mWords.end(), 0, std::plus(), [](const Word &word) -> size_t { return word.is_solution() ? 1 : 0; });
 
-    for (char c = 'a'; c <= 'z'; c++) {
-        mKeyboard.push_back(Letter(c));
-    }
-
     print();
 }
 
-State::State(ThreadPool &pool, const std::vector<const Word> &all_words, int generation, const std::vector<const Word> &words, const std::vector<const Letter> &keyboard, bool do_print)
+State::State(ThreadPool &pool, const std::vector<const Word> &all_words, int generation, const std::vector<const Word> &words, const Keyboard &keyboard, bool do_print)
     : mPool(pool)
     , mGeneration(generation)
     , mAllWords(all_words)
@@ -138,29 +134,20 @@ State State::consider_guess(const std::string &guess, uint32_t match, bool do_pr
     std::vector<const Word> filtered_words;
     std::copy_if(mWords.begin(), mWords.end(),
             std::back_inserter(filtered_words),
-            [guess, m](const Word &w) {
+            [guess, match](const Word &w) {
                 Match n(guess, w.word());
 #if DEBUG_ACCEPT_WORDS
-                if (n.value() == m.value()) { std::cout << "Accepting word \"" << w.word() << "\" with match " << n.toString() << std::endl; }
+                if (n.value() == match) { std::cout << "Accepting word \"" << w.word() << "\" with match " << n.toString() << std::endl; }
 #endif
 #if DEBUG_REJECT_WORDS
                 std::cout << "Considering word \"" << w.word() << "\" with match " << n.toString() << ": " << (n.value() == m.value() ? "accept" : "reject") << std::endl;
 #endif
-               return n.value() == m.value();
+               return n.value() == match;
             });
 
-    std::vector<const Letter> updated_keybaord;
-    for (auto letter : mKeyboard) {
-        auto ofs = guess.find(letter.value());
-        if (ofs == std::string::npos) {
-            updated_keybaord.push_back(letter);
-        }
-        else {
-            Match::Value v = m.value_at(ofs);
-            updated_keybaord.push_back(Letter(letter, v == Match::kAbsent ? Letter::kAbsent : Letter::kPresent));
-        }
-    }
-    return State(mPool, mAllWords, mGeneration + 1, filtered_words, updated_keybaord, do_print); // RVO?
+    Keyboard updated_keyboard = mKeyboard.updateWithGuess(guess, m);
+
+    return State(mPool, mAllWords, mGeneration + 1, filtered_words, updated_keyboard, do_print); // RVO?
 }
 
 double State::compute_entropy(const std::string &word) const {
@@ -210,21 +197,7 @@ double State::max_entropy() const {
 
 void State::print() const {
     std::cout << "State @ generation #" << mGeneration << ": " << mNSolutions << " solutions and " << mWords.size() << " words." << std::endl;
-    for (auto letter : mKeyboard) {
-        switch (letter.state()) {
-            case Letter::kAbsent:
-                std::cout << "⬛️";
-                break;
-            case Letter::kPresent:
-                std::cout << "🟨";
-                break;
-            case Letter::kUntested:
-                std::cout << "⬜️";
-                break;
-        }
-        std::cout << letter.value() << " ";
-    }
-    std::cout << std::endl;
+    mKeyboard.print();
 }
 
 double State::entropy_of(const std::string &word) const {
@@ -241,14 +214,13 @@ double State::entropy2_of(const std::string &word) const {
     return it->entropy();
 }
 
-ScoredEntropy::ScoredEntropy(const WordEntropy &entropy, const std::vector<const Letter> &keyboard) 
+ScoredEntropy::ScoredEntropy(const WordEntropy &entropy, const Keyboard &keyboard)
     : mEntropy(entropy)
     , mScore(0) {
 
-    for (auto letter : mEntropy.word().word()) {
-        auto it = std::find_if(keyboard.begin(), keyboard.end(), [letter](const Letter &l) { return l.value() == letter; } );
-        assert(it != keyboard.end());
-        mScore += static_cast<int>(it->state());
+    for (char c : mEntropy.word().word()) {
+        const Letter &l = keyboard.letter(c);
+        mScore += static_cast<int>(l.state());
     }
 }
 
