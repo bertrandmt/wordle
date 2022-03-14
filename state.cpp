@@ -250,7 +250,6 @@ ScoredEntropy::ScoredEntropy(const WordEntropy &entropy, const std::vector<const
         assert(it != keyboard.end());
         mScore += static_cast<int>(it->state());
     }
-    std::cout << "Computed score " << mScore << " for possible recommended guess \"" << mEntropy.word().word() << "\"." << std::endl;
 }
 
 void State::best_guess() const {
@@ -282,7 +281,6 @@ void State::best_guess() const {
     while (mEntropy2.front().entropy() == recommended_guesses_end->entropy()) {
         recommended_guesses_end++;
     }
-    auto recommended_guesses_size = std::distance(mEntropy2.begin(), recommended_guesses_end);
 
     std::vector<ScoredEntropy> scored_entropy;
     for (auto jt = mEntropy2.begin(); jt != recommended_guesses_end; jt++) {
@@ -290,14 +288,21 @@ void State::best_guess() const {
     }
     std::sort(scored_entropy.begin(), scored_entropy.end());
 
-    std::cout << "Recommending guess \"" << select_randomly(mEntropy2.begin(), recommended_guesses_end)->word().word() << "\" out of " << recommended_guesses_size << " words ";
+    auto scored_recommended_guesses_end = scored_entropy.begin();
+    while (scored_entropy.front().score() == scored_recommended_guesses_end->score()) {
+        scored_recommended_guesses_end++;
+    }
+    auto scored_recommended_guesses_size = std::distance(scored_entropy.begin(), scored_recommended_guesses_end);
+
+    std::cout << "Recommending guess \"" << select_randomly(scored_entropy.begin(), scored_recommended_guesses_end)->entropy().word().word() << "\" out of " << scored_recommended_guesses_size << " words ";
     std::cout << "(";
     bool first = true;
-    for (auto it = mEntropy2.begin(); it != recommended_guesses_end && distance(mEntropy2.begin(), it) < 15; it++) {
+    for (auto it = scored_entropy.begin(); it != scored_recommended_guesses_end && distance(scored_entropy.begin(), it) < 15; it++) {
         if (!first) std::cout << ", ";
         first = false;
-        std::cout << "\"" << it->word().word() << "\"";
+        std::cout << "\"" << it->entropy().word().word() << "\"";
     }
     std::cout << ") ";
-    std::cout << "with highest two-level entropy " << mEntropy2.front().entropy() << "." << std::endl;
+    std::cout << "with highest two-level entropy " << scored_entropy.front().entropy().entropy()
+              << " and highest score " << scored_entropy.front().score() << "." << std::endl;
 }
