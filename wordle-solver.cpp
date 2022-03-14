@@ -68,6 +68,7 @@ int main(void) {
                 std::cout << "# RESET!" << std::endl;
                 for (auto i = 0; i < N_GAMES; i++) {
                     while (states[i].size() > 1) states[i].pop_back();
+                    states[i].back().print();
                 }
                 continue;
 
@@ -104,7 +105,7 @@ int main(void) {
             ofs = ofs2;
         }
         if (matches.size() != N_GAMES) {
-           help();
+            help();
             continue;
         }
 
