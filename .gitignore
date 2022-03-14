@@ -31,4 +31,5 @@
 *.out
 *.app
 
-wordle
+wordle-solver
+wordle.txt
