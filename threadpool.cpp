@@ -7,7 +7,9 @@ ThreadPool::ThreadPool()
     : mAcceptJobs(true)
     , mNumThreads(2 * std::thread::hardware_concurrency()) {
 
+#if DEBUG_THREAD_POOL
     std::cout << "Constructing pool with " << mNumThreads << " threads." << std::endl;
+#endif // DEBUG_THREAD_POOL
     for (int i = 0; i < mNumThreads; i++) {
         mPool.push_back(std::thread(&ThreadPool::thread_function, this, i));
     }
