@@ -116,6 +116,7 @@ Match Match::fromString(const std::string &guess, const std::string match_string
             case '_':
             case '-':
             case 'a':
+            case 'A':
                 break;
             default:
                 ok = false;
