@@ -196,7 +196,7 @@ double State::max_entropy() const {
 }
 
 void State::print() const {
-    std::cout << "State @ generation #" << mGeneration << ": " << mNSolutions << " solutions and " << mWords.size() << " words." << std::endl;
+    std::cout << "State[gen#" << mGeneration << "]: " << mNSolutions << " solutions and " << mWords.size() << " words." << std::endl;
     mKeyboard.print();
 }
 
