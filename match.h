@@ -1,3 +1,5 @@
+// Copyright (c) 2022, Bertrand Mollinier Toublet
+// See LICENSE for details of BSD 3-Clause License
 #pragma once
 
 #include <string>
