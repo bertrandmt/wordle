@@ -34,7 +34,7 @@ private:
 
 class WordEntropy {
 public:
-    inline WordEntropy(const Word &word, double entropy)
+    inline WordEntropy(const Word &word, uint32_t entropy)
         : mWord(word)
         , mEntropy(entropy) { }
 
@@ -46,7 +46,7 @@ public:
         return mWord;
     }
 
-    inline double entropy() const {
+    inline uint32_t entropy() const {
         return mEntropy;
     }
 
@@ -56,7 +56,7 @@ public:
 
 private:
     Word mWord;
-    double mEntropy;
+    uint32_t mEntropy;
 };
 
 class ScoredEntropy {
@@ -85,22 +85,22 @@ public:
     State(ThreadPool &pool, const std::vector<const Word> &all_words);
     State consider_guess(const std::string &guess, uint32_t match, bool do_print = true) const;
 
-    double max_entropy() const;
+    uint32_t max_entropy() const;
     inline size_t n_solutions() const {
         return mNSolutions;
     }
     void print() const;
 
-    double entropy_of(const std::string &word) const;
-    double entropy2_of(const std::string &word) const;
+    uint32_t entropy_of(const std::string &word) const;
+    uint32_t entropy2_of(const std::string &word) const;
 
     void best_guess() const;
 
 private:
     State(ThreadPool &pool, const std::vector<const Word> &all_words, int generation, const std::vector<const Word> &words, const Keyboard &keyboard, bool do_print = true);
 
-    double compute_entropy(const std::string &word) const;
-    double compute_entropy2(const std::string &word) const;
+    uint32_t compute_entropy(const std::string &word) const;
+    uint32_t compute_entropy2(const std::string &word) const;
 
     ThreadPool &mPool;
 
@@ -109,7 +109,7 @@ private:
     const std::vector<const Word> mWords;
     size_t mNSolutions;
 
-    double mMaxEntropy;
+    uint32_t mMaxEntropy;
     std::vector<WordEntropy> mEntropy;
     std::vector<WordEntropy> mEntropy2;
 

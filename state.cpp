@@ -87,8 +87,8 @@ State::State(ThreadPool &pool, const std::vector<const Word> &all_words, int gen
     }
 
     /* 3. compute max entropy */
-    mMaxEntropy = std::transform_reduce(mEntropy.begin(), mEntropy.end(), 0.0, [](double max_h, double h) { return std::max(h, max_h); },
-                                                                               [](const WordEntropy &e) -> double { return e.entropy(); });
+    mMaxEntropy = std::transform_reduce(mEntropy.begin(), mEntropy.end(), 0, [](uint32_t max_h, uint32_t h) { return std::max(h, max_h); },
+                                                                               [](const WordEntropy &e) -> uint32_t { return e.entropy(); });
 
     /* 5. sort entropy decreasing */
     std::sort(mEntropy.begin(), mEntropy.end());
@@ -103,7 +103,7 @@ State::State(ThreadPool &pool, const std::vector<const Word> &all_words, int gen
             pool.push([i, block_sz, this, &lock, &ndone, &cond]() {
                     for (auto j = i * block_sz; j < (i+1) * block_sz && j < mEntropy2.size(); j++) {
                         const Word &word = mEntropy.at(j).word();
-                        double h = mEntropy.at(j).entropy();
+                        uint32_t h = mEntropy.at(j).entropy();
                         mEntropy2.at(j) = WordEntropy(word, h + compute_entropy2(word.word()));
                     }
                     {
@@ -150,7 +150,7 @@ State State::consider_guess(const std::string &guess, uint32_t match, bool do_pr
     return State(mPool, mAllWords, mGeneration + 1, filtered_words, updated_keyboard, do_print); // RVO?
 }
 
-double State::compute_entropy(const std::string &word) const {
+uint32_t State::compute_entropy(const std::string &word) const {
     std::vector<uint32_t> match_counts(kMaxMatchValue + 1, 0);
 
     for (auto solution : mWords) {
@@ -166,10 +166,10 @@ double State::compute_entropy(const std::string &word) const {
         double Pxi = (double)cnt / mNSolutions;
         H -= Pxi * std::log(Pxi);
     }
-    return H;
+    return static_cast<uint32_t>(H * 1000);
 }
 
-double State::compute_entropy2(const std::string &word) const {
+uint32_t State::compute_entropy2(const std::string &word) const {
     std::vector<uint32_t> match_counts(kMaxMatchValue + 1, 0);
 
     for (auto solution : mWords) {
@@ -188,10 +188,10 @@ double State::compute_entropy2(const std::string &word) const {
         double Pxi = (double)match_counts[match] / mNSolutions;
         H += Pxi * H_2;
     }
-    return H;
+    return static_cast<uint32_t>(H);
 }
 
-double State::max_entropy() const {
+uint32_t State::max_entropy() const {
     return mMaxEntropy;
 }
 
@@ -200,14 +200,14 @@ void State::print() const {
     mKeyboard.print();
 }
 
-double State::entropy_of(const std::string &word) const {
+uint32_t State::entropy_of(const std::string &word) const {
     auto it = std::find_if(mEntropy.begin(), mEntropy.end(), [word](const WordEntropy &e){ return e.word().word() == word; });
     if (it == mEntropy.end()) return 0;
 
     return it->entropy();
 }
 
-double State::entropy2_of(const std::string &word) const {
+uint32_t State::entropy2_of(const std::string &word) const {
     auto it = std::find_if(mEntropy2.begin(), mEntropy2.end(), [word](const WordEntropy &e){ return e.word().word() == word; });
     if (it == mEntropy2.end()) return 0;
 
@@ -218,9 +218,13 @@ ScoredEntropy::ScoredEntropy(const WordEntropy &entropy, const Keyboard &keyboar
     : mEntropy(entropy)
     , mScore(0) {
 
+    bool seen['z'-'a'] = { false };
     for (char c : mEntropy.word().word()) {
         const Letter &l = keyboard.letter(c);
-        mScore += static_cast<int>(l.state());
+        if (!seen[c - 'a']) {
+            mScore += static_cast<int>(l.state());
+            seen[c - 'a'] = true;
+        }
     }
 }
 
@@ -275,6 +279,6 @@ void State::best_guess() const {
         std::cout << "\"" << it->entropy().word().word() << "\"";
     }
     std::cout << ") ";
-    std::cout << "with highest two-level entropy " << scored_entropy.front().entropy().entropy()
+    std::cout << "with highest two-level entropy " << scored_entropy.front().entropy().entropy() / 1000.
               << " and highest score " << scored_entropy.front().score() << "." << std::endl;
 }
