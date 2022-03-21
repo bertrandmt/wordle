@@ -9,3 +9,5 @@
 #define DEBUG_THREAD_POOL       (0)
 #define ENTROPY_2_TOP_N         (1000)
 #define N_GAMES                 (1)
+#define MAX_N_SOLUTIONS_PRINTED (12)
+#define MAX_N_GUESSES_PRINTED   (10)

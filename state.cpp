@@ -199,7 +199,7 @@ uint32_t State::max_entropy() const {
 
 void State::print() const {
     std::cout << "State[gen#" << mGeneration << "]: " << mNSolutions << " solutions and " << mWords.size() << " words." << std::endl;
-    mKeyboard.print();
+    //mKeyboard.print();
 }
 
 uint32_t State::entropy_of(const std::string &word) const {
@@ -243,12 +243,12 @@ void State::best_guess() const {
         return;
     }
 
-    if (mNSolutions <= 15) {
+    if (mNSolutions <= MAX_N_SOLUTIONS_PRINTED) {
         std::cout << "Solutions and associated entropy:" << std::endl;
         for (auto word : mWords) {
             if (word.is_solution()) {
                 auto it = std::find_if(mEntropy2.begin(), mEntropy2.end(), [word](const WordEntropy &e) { return e.word().word() == word.word(); });
-                auto h = (it == mEntropy2.end()) ? 0.0 : it->entropy();
+                auto h = (it == mEntropy2.end()) ? 0.0 : it->entropy() / 1000.;
 
                 std::cout << "\t\"" << word.word() << "\": " << h << std::endl;
             }
@@ -275,7 +275,7 @@ void State::best_guess() const {
     std::cout << "Recommending guess \"" << select_randomly(scored_entropy.begin(), scored_recommended_guesses_end)->entropy().word().word() << "\" out of " << scored_recommended_guesses_size << " words ";
     std::cout << "(";
     bool first = true;
-    for (auto it = scored_entropy.begin(); it != scored_recommended_guesses_end && distance(scored_entropy.begin(), it) < 15; it++) {
+    for (auto it = scored_entropy.begin(); it != scored_recommended_guesses_end && distance(scored_entropy.begin(), it) < MAX_N_GUESSES_PRINTED; it++) {
         if (!first) std::cout << ", ";
         first = false;
         std::cout << "\"" << it->entropy().word().word() << "\"";
