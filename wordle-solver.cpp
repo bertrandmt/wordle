@@ -111,28 +111,29 @@ int main(void) {
             continue;
         }
 
-        bool ok = true;
-        for (auto match : matches) {
-            ok &= (guess.size() == match.size());
-        }
-        if (!ok) {
-            help();
-            continue;
-        }
-
         for (auto i = 0; i < N_GAMES; i++) {
-            bool ok = true;
-            Match m = Match::fromString(guess, matches[i], ok);
-            if (!ok) {
-                help();
-                continue;
+            if (states[i].back().n_solutions() == 1) {
+                auto s = states[i].back();
+                states[i].push_back(s);
+                s.best_guess();
             }
+            else {
+                if (guess.size() != matches[i].size()) {
+                    help();
+                    continue;
+                }
 
-            auto s = (states[i].back().n_solutions() == 1)
-                ? states[i].back()
-                : states[i].back().consider_guess(guess, m.value());
-            states[i].push_back(s);
-            s.best_guess();
+                bool ok = true;
+                Match m = Match::fromString(guess, matches[i], ok);
+                if (!ok) {
+                    help();
+                    continue;
+                }
+
+                auto s = states[i].back().consider_guess(guess, m.value());
+                states[i].push_back(s);
+                s.best_guess();
+            }
         }
     }
 
