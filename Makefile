@@ -1,4 +1,4 @@
-CPPFLAGS=-std=c++20 # -g -Wall
+CPPFLAGS=-std=c++20 -O3 # -g -Wall
 CC=$(CXX)
 
 wordle-solver: keyboard.o match.o state.o threadpool.o wordlist.o

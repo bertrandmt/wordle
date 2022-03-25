@@ -5,7 +5,10 @@
 #include <cassert>
 #include <condition_variable>
 #include <mutex>
+#include <shared_mutex>
+#include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "keyboard.h"
@@ -32,6 +35,27 @@ public:
 private:
     std::string mWord;
     bool mIsSolution;
+};
+
+template <>
+struct std::hash<std::vector<const Word>> {
+    std::size_t operator()(std::vector<const Word> const& words) const noexcept {
+        std::stringstream ss;
+        std::for_each(words.begin(), words.end(), [&ss](const Word &s) { ss << s.word(); });
+        std::string s = ss.str();
+        return std::hash<std::string>{}(s);
+    }
+};
+
+template <>
+struct std::equal_to<std::vector<const Word>> {
+    bool operator()(const std::vector<const Word> &lhs, const std::vector<const Word> &rhs) const {
+        if (lhs.size() != rhs.size()) return false;
+        for (auto lit = lhs.cbegin(), rit = rhs.cbegin(); lit != lhs.end(); lit++, rit++) {
+            if (lit->word() != rit->word()) return false;
+        }
+        return true;
+    }
 };
 
 class WordEntropy {
@@ -84,8 +108,8 @@ private:
 
 class State {
 public:
-    State(ThreadPool &pool, const std::vector<const Word> &all_words);
-    State consider_guess(const std::string &guess, uint32_t match, bool do_print = true) const;
+    State(ThreadPool &pool, std::unordered_map<std::vector<const Word>, State> &state_cache, std::shared_mutex &state_cache_mutex, const std::vector<const Word> &all_words);
+    State &consider_guess(const std::string &guess, uint32_t match, bool do_print = true) const;
 
     uint32_t max_entropy() const;
     inline size_t n_solutions() const {
@@ -99,12 +123,16 @@ public:
     void best_guess() const;
 
 private:
-    State(ThreadPool &pool, const std::vector<const Word> &all_words, int generation, const std::vector<const Word> &words, const Keyboard &keyboard, bool do_print = true);
+    State(const State &other, const std::vector<const Word> &words, const Keyboard &keyboard, bool do_print = true);
 
-    uint32_t compute_entropy(const std::string &word) const;
-    uint32_t compute_entropy2(const std::string &word) const;
+    uint32_t compute_entropy_of(const std::string &word) const;
+    uint32_t compute_entropy2_of(const std::string &word) const;
+
+    void compute_real_entropy() const;
 
     ThreadPool &mPool;
+    std::unordered_map<std::vector<const Word>, State> &mStateCache;
+    std::shared_mutex &mStateCacheMutex;
 
     const int mGeneration;
     const std::vector<const Word> &mAllWords;
@@ -112,8 +140,10 @@ private:
     size_t mNSolutions;
 
     uint32_t mMaxEntropy;
-    std::vector<WordEntropy> mEntropy;
-    std::vector<WordEntropy> mEntropy2;
+    mutable std::vector<WordEntropy> mEntropy;
+    mutable std::vector<WordEntropy> mEntropy2;
+    mutable bool mRealEntropyComputed;
 
     Keyboard mKeyboard;
 };
+

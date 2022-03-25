@@ -1,8 +1,11 @@
 // Copyright (c) 2022, Bertrand Mollinier Toublet
 // See LICENSE for details of BSD 3-Clause License
+#include <functional>
 #include <iostream>
+#include <shared_mutex>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 #include "config.h"
@@ -35,6 +38,8 @@ int main(void) {
 #endif
 
     ThreadPool pool;
+    std::unordered_map<std::vector<const Word>, State> state_cache;
+    std::shared_mutex state_cache_mutex;
 
     std::vector<const Word> words;
     for (auto w : solutions) {
@@ -44,9 +49,12 @@ int main(void) {
         words.push_back(Word(w, false));
     }
 
-    std::vector<const State> states[N_GAMES];
+    auto p = state_cache.insert(std::make_pair(words, State(pool, state_cache, state_cache_mutex, words)));
+    assert(p.second);
+
+    std::vector<std::reference_wrapper<const State>> states[N_GAMES];
     for (auto i = 0; i < N_GAMES; i++) {
-        states[i].push_back(State(pool, words));
+        states[i].push_back(p.first->second);
     }
 
     std::cout << "Initial best guess is \"trace\"." << std::endl;
@@ -70,7 +78,7 @@ int main(void) {
                 std::cout << "# RESET!" << std::endl;
                 for (auto i = 0; i < N_GAMES; i++) {
                     while (states[i].size() > 1) states[i].pop_back();
-                    states[i].back().print();
+                    states[i].back().get().print();
                 }
                 continue;
 
@@ -78,16 +86,16 @@ int main(void) {
                 std::cout << "^ BACK ONE" << std::endl;
                 for (auto i = 0; i < N_GAMES; i++) {
                     states[i].pop_back();
-                    states[i].back().print();
-                    states[i].back().best_guess();
+                    states[i].back().get().print();
+                    states[i].back().get().best_guess();
                 }
                 continue;
 
             case '?': { // what is the entropy of the word?
                 std::string word = nowsline.substr(1);
                 for (auto i = 0; i < N_GAMES; i++) {
-                    std::cout << "[" << i << "] H(\"" << word << "\") = " << states[i].back().entropy_of(word) << std::endl;
-                    std::cout << "[" << i << "]H2(\"" << word << "\") = " << states[i].back().entropy2_of(word) << std::endl;
+                    std::cout << "[" << i << "] H(\"" << word << "\") = " << states[i].back().get().entropy_of(word) << std::endl;
+                    std::cout << "[" << i << "]H2(\"" << word << "\") = " << states[i].back().get().entropy2_of(word) << std::endl;
                 }
                 }
                 continue;
@@ -112,10 +120,10 @@ int main(void) {
         }
 
         for (auto i = 0; i < N_GAMES; i++) {
-            if (states[i].back().n_solutions() == 1) {
+            if (states[i].back().get().n_solutions() == 1) {
                 auto s = states[i].back();
                 states[i].push_back(s);
-                s.best_guess();
+                s.get().best_guess();
             }
             else {
                 if (guess.size() != matches[i].size()) {
@@ -130,9 +138,10 @@ int main(void) {
                     continue;
                 }
 
-                auto s = states[i].back().consider_guess(guess, m.value());
-                states[i].push_back(s);
-                s.best_guess();
+                const State &s = states[i].back();
+                const State &t = s.consider_guess(guess, m.value());
+                states[i].push_back(t);
+                t.best_guess();
             }
         }
     }
