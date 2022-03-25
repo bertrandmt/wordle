@@ -252,7 +252,7 @@ uint32_t State::max_entropy() const {
 }
 
 void State::print() const {
-    std::cout << "State[gen#" << mGeneration << ", hash #" << std::hash<Words>{}(mWords) << "]: " << mNSolutions << " solutions and " << mWords.size() << " words." << std::endl;
+    std::cout << "State[gen:" << mGeneration << "|hash:" << std::hash<Words>{}(mWords) << "]: " << mNSolutions << " solutions and " << mWords.size() << " words." << std::endl;
     //mKeyboard.print();
 }
 
@@ -290,6 +290,10 @@ ScoredEntropy::ScoredEntropy(const WordEntropy &entropy, const Keyboard &keyboar
 
 void State::best_guess() const {
     /* stop! */
+    if (mGeneration == 1) {
+        std::cout << "Initial best guess is \"trace\"." << std::endl;
+        return;
+    }
     if (mNSolutions == 0) {
         std::cout << "No solution left 😭" << std::endl;
         return;
@@ -335,15 +339,13 @@ void State::best_guess() const {
     }
     auto scored_recommended_guesses_size = std::distance(scored_entropy.begin(), scored_recommended_guesses_end);
 
-    std::cout << "Recommending guess \"" << select_randomly(scored_entropy.begin(), scored_recommended_guesses_end)->entropy().word().word() << "\" out of " << scored_recommended_guesses_size << " words ";
-    std::cout << "(";
+    std::cout << "[H=" << scored_entropy.front().entropy().entropy() / 1000. << "|S=" << scored_entropy.front().score()
+              << "] \"" << select_randomly(scored_entropy.begin(), scored_recommended_guesses_end)->entropy().word().word() << "\" (" << scored_recommended_guesses_size << " words: ";
     bool first = true;
     for (auto it = scored_entropy.begin(); it != scored_recommended_guesses_end && distance(scored_entropy.begin(), it) < MAX_N_GUESSES_PRINTED; it++) {
         if (!first) std::cout << ", ";
         first = false;
         std::cout << "\"" << it->entropy().word().word() << "\"";
     }
-    std::cout << ") ";
-    std::cout << "with highest two-level entropy " << scored_entropy.front().entropy().entropy() / 1000.
-              << " and highest score " << scored_entropy.front().score() << "." << std::endl;
+    std::cout << ") " << std::endl;
 }

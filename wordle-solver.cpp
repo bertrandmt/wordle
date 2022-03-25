@@ -48,13 +48,23 @@ int main(void) {
 
     auto p = state_cache.insert(words, State(pool, state_cache, words));
     assert(p.second);
+    State &initial_state = p.first->second;
 
-    std::vector<std::reference_wrapper<const State>> states[N_GAMES];
-    for (auto i = 0; i < N_GAMES; i++) {
-        states[i].push_back(p.first->second);
+    enum nStates : int {
+        kWordleNStates = 1,
+        kQuordleNStates = 4,
+        kOctordleNStates = 8,
+    };
+    std::vector<std::reference_wrapper<const State>> wordle_states[kWordleNStates];
+    std::vector<std::reference_wrapper<const State>> quordle_states[kQuordleNStates];
+    std::vector<std::reference_wrapper<const State>> octordle_states[kOctordleNStates];
+
+    nStates current_game = kWordleNStates;
+    std::vector<std::reference_wrapper<const State>> *current_game_states = &wordle_states[0];
+    for (auto i = 0; i < current_game; i++) {
+        current_game_states[i].push_back(initial_state);
     }
-
-    std::cout << "Initial best guess is \"trace\"." << std::endl;
+    initial_state.best_guess();
 
     for (std::string line; std::cout << "] " << std::flush && std::getline(std::cin, line);) {
 
@@ -73,26 +83,55 @@ int main(void) {
 
             case '!': // reset!
                 std::cout << "# RESET!" << std::endl;
-                for (auto i = 0; i < N_GAMES; i++) {
-                    while (states[i].size() > 1) states[i].pop_back();
-                    states[i].back().get().print();
+                for (auto i = 0; i < current_game; i++) {
+                    current_game_states[i].clear();
+                    current_game_states[i].push_back(initial_state);
                 }
+                initial_state.print();
                 continue;
 
             case '^': // back one
                 std::cout << "^ BACK ONE" << std::endl;
-                for (auto i = 0; i < N_GAMES; i++) {
-                    states[i].pop_back();
-                    states[i].back().get().print();
-                    states[i].back().get().best_guess();
+                if (current_game_states[0].size() == 1) {
+                    std::cout << "Already at initial state" << std::endl;
+                    continue;
                 }
+
+                for (auto i = 0; i < current_game; i++) {
+                    current_game_states[i].pop_back();
+                    current_game_states[i].back().get().print();
+                    current_game_states[i].back().get().best_guess();
+                }
+                continue;
+
+            case '%': // change number of concurrent games
+                switch (current_game) {
+                    case kWordleNStates:
+                        current_game = kQuordleNStates;
+                        current_game_states = quordle_states;
+                        break;
+                    case kQuordleNStates:
+                        current_game = kOctordleNStates;
+                        current_game_states = octordle_states;
+                        break;
+                    case kOctordleNStates:
+                        current_game = kWordleNStates;
+                        current_game_states = wordle_states;
+                        break;
+                }
+                std::cout << "% SWITCHING TO " << current_game << " CONCURRENT GAMES" << std::endl;
+                for (auto i = 0; i < current_game; i++) {
+                    current_game_states[i].clear();
+                    current_game_states[i].push_back(initial_state);
+                }
+                initial_state.best_guess();
                 continue;
 
             case '?': { // what is the entropy of the word?
                 std::string word = nowsline.substr(1);
-                for (auto i = 0; i < N_GAMES; i++) {
-                    std::cout << "[" << i << "] H(\"" << word << "\") = " << states[i].back().get().entropy_of(word) << std::endl;
-                    std::cout << "[" << i << "]H2(\"" << word << "\") = " << states[i].back().get().entropy2_of(word) << std::endl;
+                for (auto i = 0; i < current_game; i++) {
+                    std::cout << "[" << i << "] H(\"" << word << "\") = " << current_game_states[i].back().get().entropy_of(word) << std::endl;
+                    std::cout << "[" << i << "]H2(\"" << word << "\") = " << current_game_states[i].back().get().entropy2_of(word) << std::endl;
                 }
                 }
                 continue;
@@ -111,15 +150,15 @@ int main(void) {
             matches.push_back(match);
             ofs = ofs2;
         }
-        if (matches.size() != N_GAMES) {
+        if (matches.size() != current_game) {
             help();
             continue;
         }
 
-        for (auto i = 0; i < N_GAMES; i++) {
-            if (states[i].back().get().n_solutions() == 1) {
-                auto s = states[i].back();
-                states[i].push_back(s);
+        for (auto i = 0; i < current_game; i++) {
+            if (current_game_states[i].back().get().n_solutions() == 1) {
+                auto s = current_game_states[i].back();
+                current_game_states[i].push_back(s);
                 s.get().best_guess();
             }
             else {
@@ -135,9 +174,9 @@ int main(void) {
                     continue;
                 }
 
-                const State &s = states[i].back();
+                const State &s = current_game_states[i].back();
                 const State &t = s.consider_guess(guess, m.value());
-                states[i].push_back(t);
+                current_game_states[i].push_back(t);
                 t.best_guess();
             }
         }
