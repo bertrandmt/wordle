@@ -1,13 +1,16 @@
 // Copyright (c) 2022, Bertrand Mollinier Toublet
 // See LICENSE for details of BSD 3-Clause License
 #include <cmath>
+#include <condition_variable>
 #include <iostream>
 #include <iterator>
+#include <mutex>
 #include <random>
 
 #include "config.h"
 #include "match.h"
 #include "state.h"
+#include "statecache.h"
 
 namespace {
 
@@ -27,10 +30,9 @@ Iter select_randomly(Iter start, Iter end) {
 
 } // namespace anonymous
 
-State::State(ThreadPool &pool, std::unordered_map<std::vector<const Word>, State> &state_cache, std::shared_mutex &state_cache_mutex, const std::vector<const Word> &all_words)
+State::State(ThreadPool &pool, StateCache &state_cache, const Words &all_words)
     : mPool(pool)
     , mStateCache(state_cache)
-    , mStateCacheMutex(state_cache_mutex)
     , mGeneration(1)
     , mAllWords(all_words)
     , mWords(all_words)
@@ -105,13 +107,12 @@ void State::compute_real_entropy() const {
     std::sort(mEntropy2.begin(), mEntropy2.end());
 }
 
-State::State(const State &other, const std::vector<const Word> &words, const Keyboard &keyboard, bool do_print)
+State::State(const State &other, const Words &filtered_words, const Keyboard &keyboard, bool do_print)
     : mPool(other.mPool)
     , mStateCache(other.mStateCache)
-    , mStateCacheMutex(other.mStateCacheMutex)
     , mGeneration(other.mGeneration + 1)
     , mAllWords(other.mAllWords)
-    , mWords(words)
+    , mWords(filtered_words)
     , mMaxEntropy(0)
     , mRealEntropyComputed(do_print)
     , mKeyboard(keyboard) {
@@ -142,7 +143,7 @@ State &State::consider_guess(const std::string &guess, uint32_t match, bool do_p
         std::cout << "Considering guess \"" << guess << "\" with match " << m.toString() << std::endl;
     }
 
-    std::vector<const Word> filtered_words;
+    Words filtered_words;
     std::copy_if(mWords.begin(), mWords.end(),
             std::back_inserter(filtered_words),
             [guess, match](const Word &w) {
@@ -158,40 +159,51 @@ State &State::consider_guess(const std::string &guess, uint32_t match, bool do_p
 
     Keyboard updated_keyboard = mKeyboard.updateWithGuess(guess, m);
 
-    {
-        std::shared_lock sl(mStateCacheMutex);
-
-        auto it = mStateCache.find(filtered_words);
-        if (it != mStateCache.end()) {
+    auto it = mStateCache.find(filtered_words);
+    if (it != mStateCache.end()) {
 #if DEBUG_STATE_CACHE
-            std::cout << "+" << std::flush;
+        std::cout << "+" << std::flush;
 #endif // DEBUG_STATE_CACHE
-            return it->second;
-        }
-        else {
-            sl.unlock(); // explicitly unlock...
 
-#if DEBUG_STATE_CACHE
-            std::cout << "-" << std::flush;
-#endif // DEBUG_STATE_CACHE
-            State s(*this, filtered_words, updated_keyboard, do_print);
-
-            {
-                std::unique_lock ul(mStateCacheMutex); // in order to acquire an exclusive lock to the mutex
-                auto jt = mStateCache.insert(std::make_pair(filtered_words, std::move(s)));
-                if (!jt.second) {
-                    assert(std::equal_to<std::vector<const Word>>{}(filtered_words, jt.first->second.mWords));
-#if DEBUG_STATE_CACHE
-                    std::cout << "FAILED to insert state with filtered words: " << std::endl;
-                    std::for_each(filtered_words.begin(), filtered_words.end(), [](const Word &w) { std::cout << "\"" << w.word() << "\", "; });
-                    std::cout << std::endl
-                              << "It was probably inserted concurrently; continuing" << std::endl;
-#endif // DEBUG_STATE_CACHE
-                }
-                return jt.first->second;
-            }
-        }
+        return it->second;
     }
+    else {
+#if DEBUG_STATE_CACHE
+        std::cout << "-" << std::flush;
+#endif // DEBUG_STATE_CACHE
+
+        State s(*this, filtered_words, updated_keyboard, do_print);
+        auto jt = mStateCache.insert(filtered_words, std::move(s));
+        return jt.first->second;
+    }
+//    {
+//        std::shared_lock sl(mStateCacheMutex);
+//
+//        auto it = mStateCache.find(filtered_words);
+//        if (it != mStateCache.end()) {
+//            return it->second;
+//        }
+//        else {
+//            sl.unlock(); // explicitly unlock...
+//
+//            State s(*this, filtered_words, updated_keyboard, do_print);
+//
+//            {
+//                std::unique_lock ul(mStateCacheMutex); // in order to acquire an exclusive lock to the mutex
+//                auto jt = mStateCache.insert(std::make_pair(filtered_words, std::move(s)));
+//                if (!jt.second) {
+//                    assert(std::equal_to<Words>{}(filtered_words, jt.first->second.mWords));
+//#if DEBUG_STATE_CACHE
+//                    std::cout << "FAILED to insert state with filtered words: " << std::endl;
+//                    std::for_each(filtered_words.begin(), filtered_words.end(), [](const Word &w) { std::cout << "\"" << w.word() << "\", "; });
+//                    std::cout << std::endl
+//                              << "It was probably inserted concurrently; continuing" << std::endl;
+//#endif // DEBUG_STATE_CACHE
+//                }
+//                return jt.first->second;
+//            }
+//        }
+//    }
 }
 
 uint32_t State::compute_entropy_of(const std::string &word) const {
@@ -240,7 +252,7 @@ uint32_t State::max_entropy() const {
 }
 
 void State::print() const {
-    std::cout << "State[gen#" << mGeneration << ", hash #" << std::hash<std::vector<const Word> >{}(mWords) << "]: " << mNSolutions << " solutions and " << mWords.size() << " words." << std::endl;
+    std::cout << "State[gen#" << mGeneration << ", hash #" << std::hash<Words>{}(mWords) << "]: " << mNSolutions << " solutions and " << mWords.size() << " words." << std::endl;
     //mKeyboard.print();
 }
 
@@ -256,6 +268,10 @@ uint32_t State::entropy2_of(const std::string &word) const {
     if (it == mEntropy2.end()) return 0;
 
     return it->entropy();
+}
+
+bool State::words_equal_to(const Words &other_words) const {
+    return std::equal_to<Words>{}(mWords, other_words);
 }
 
 ScoredEntropy::ScoredEntropy(const WordEntropy &entropy, const Keyboard &keyboard)

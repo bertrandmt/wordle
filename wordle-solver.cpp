@@ -2,15 +2,13 @@
 // See LICENSE for details of BSD 3-Clause License
 #include <functional>
 #include <iostream>
-#include <shared_mutex>
 #include <string>
-#include <thread>
-#include <unordered_map>
 #include <vector>
 
 #include "config.h"
 #include "match.h"
 #include "state.h"
+#include "statecache.h"
 #include "threadpool.h"
 #include "wordlist.h"
 
@@ -38,8 +36,7 @@ int main(void) {
 #endif
 
     ThreadPool pool;
-    std::unordered_map<std::vector<const Word>, State> state_cache;
-    std::shared_mutex state_cache_mutex;
+    StateCache state_cache;
 
     std::vector<const Word> words;
     for (auto w : solutions) {
@@ -49,7 +46,7 @@ int main(void) {
         words.push_back(Word(w, false));
     }
 
-    auto p = state_cache.insert(std::make_pair(words, State(pool, state_cache, state_cache_mutex, words)));
+    auto p = state_cache.insert(words, State(pool, state_cache, words));
     assert(p.second);
 
     std::vector<std::reference_wrapper<const State>> states[N_GAMES];
