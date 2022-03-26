@@ -50,21 +50,28 @@ int main(void) {
     auto p = state_cache.insert(words, initial_state);
     assert(p.second);
 
+    Keyboard initial_keyboard;
+
+    typedef std::pair<std::shared_ptr<State>, Keyboard> GameState;
+    GameState initial_gamestate = std::make_pair(initial_state, initial_keyboard);
+
     enum nStates : int {
         kWordleNStates = 1,
         kQuordleNStates = 4,
         kOctordleNStates = 8,
     };
-    std::vector<std::shared_ptr<State>> wordle_states[kWordleNStates];
-    std::vector<std::shared_ptr<State>> quordle_states[kQuordleNStates];
-    std::vector<std::shared_ptr<State>> octordle_states[kOctordleNStates];
+
+
+    std::vector<GameState> wordle_states[kWordleNStates];
+    std::vector<GameState> quordle_states[kQuordleNStates];
+    std::vector<GameState> octordle_states[kOctordleNStates];
 
     nStates current_game = kWordleNStates;
-    std::vector<std::shared_ptr<State>> *current_game_states = wordle_states;
+    std::vector<GameState> *current_game_states = wordle_states;
     for (auto i = 0; i < current_game; i++) {
-        current_game_states[i].push_back(initial_state);
+        current_game_states[i].push_back(initial_gamestate);
     }
-    initial_state->best_guess();
+    initial_state->best_guess(initial_keyboard);
 
     for (std::string line; std::cout << "] " << std::flush && std::getline(std::cin, line);) {
 
@@ -85,7 +92,7 @@ int main(void) {
                 std::cout << "# RESET!" << std::endl;
                 for (auto i = 0; i < current_game; i++) {
                     current_game_states[i].clear();
-                    current_game_states[i].push_back(initial_state);
+                    current_game_states[i].push_back(initial_gamestate);
                 }
                 initial_state->print();
                 continue;
@@ -99,8 +106,8 @@ int main(void) {
 
                 for (auto i = 0; i < current_game; i++) {
                     current_game_states[i].pop_back();
-                    current_game_states[i].back()->print();
-                    current_game_states[i].back()->best_guess();
+                    current_game_states[i].back().first->print();
+                    current_game_states[i].back().first->best_guess(current_game_states[i].back().second);
                 }
                 continue;
 
@@ -122,16 +129,16 @@ int main(void) {
                 std::cout << "% SWITCHING TO " << current_game << " CONCURRENT GAMES" << std::endl;
                 for (auto i = 0; i < current_game; i++) {
                     current_game_states[i].clear();
-                    current_game_states[i].push_back(initial_state);
+                    current_game_states[i].push_back(initial_gamestate);
                 }
-                initial_state->best_guess();
+                initial_state->best_guess(initial_keyboard);
                 continue;
 
             case '?': { // what is the entropy of the word?
                 std::string word = nowsline.substr(1);
                 for (auto i = 0; i < current_game; i++) {
-                    std::cout << "[" << i << "] H(\"" << word << "\") = " << current_game_states[i].back()->entropy_of(word) << std::endl;
-                    std::cout << "[" << i << "]H2(\"" << word << "\") = " << current_game_states[i].back()->entropy2_of(word) << std::endl;
+                    std::cout << "[" << i << "] H(\"" << word << "\") = " << current_game_states[i].back().first->entropy_of(word) << std::endl;
+                    std::cout << "[" << i << "]H2(\"" << word << "\") = " << current_game_states[i].back().first->entropy2_of(word) << std::endl;
                 }
                 }
                 continue;
@@ -156,10 +163,10 @@ int main(void) {
         }
 
         for (auto i = 0; i < current_game; i++) {
-            if (current_game_states[i].back()->n_solutions() == 1) {
+            if (current_game_states[i].back().first->n_solutions() == 1) {
                 auto s = current_game_states[i].back();
                 current_game_states[i].push_back(s);
-                s->best_guess();
+                s.first->best_guess(s.second);
             }
             else {
                 if (guess.size() != matches[i].size()) {
@@ -174,9 +181,11 @@ int main(void) {
                     continue;
                 }
 
-                auto s = current_game_states[i].back()->consider_guess(guess, m.value());
-                current_game_states[i].push_back(s);
-                s->best_guess();
+                auto p = current_game_states[i].back();
+                auto s = p.first->consider_guess(guess, m.value());
+                auto k = p.second.updateWithGuess(guess, m);
+                current_game_states[i].push_back(std::make_pair(s, k));
+                s->best_guess(k);
             }
         }
     }

@@ -115,16 +115,14 @@ void State::compute_real_entropy() const {
     std::sort(mEntropy2.begin(), mEntropy2.end());
 }
 
-State::State(const State &other, const Words &filtered_words, const Keyboard &keyboard, bool do_full_compute)
+State::State(const State &other, const Words &filtered_words, bool do_full_compute)
     : mPool(other.mPool)
     , mStateCache(other.mStateCache)
     , mGeneration(other.mGeneration + 1)
     , mAllWords(other.mAllWords)
     , mWords(filtered_words)
     , mMaxEntropy(0)
-    , mFullyComputed(do_full_compute)
-    , mKeyboard(keyboard) {
-
+    , mFullyComputed(do_full_compute) {
 
     /* 1. compute number of solutions among words */
     mNSolutions = std::transform_reduce(mWords.begin(), mWords.end(), 0, std::plus(), [](const Word &word) -> size_t { return word.is_solution() ? 1 : 0; });
@@ -165,8 +163,6 @@ std::shared_ptr<State> State::consider_guess(const std::string &guess, uint32_t 
                return n.value() == match;
             });
 
-    Keyboard updated_keyboard = mKeyboard.updateWithGuess(guess, m);
-
     if (mStateCache.contains(filtered_words)) {
 #if DEBUG_STATE_CACHE
         std::cout << "+" << std::flush;
@@ -179,7 +175,7 @@ std::shared_ptr<State> State::consider_guess(const std::string &guess, uint32_t 
         std::cout << "-" << std::flush;
 #endif // DEBUG_STATE_CACHE
 
-        std::shared_ptr<State> s(new State(*this, filtered_words, updated_keyboard, do_full_compute));
+        std::shared_ptr<State> s(new State(*this, filtered_words, do_full_compute));
         auto jt = mStateCache.insert(filtered_words, s);
         return jt.first->second;
     }
@@ -232,7 +228,6 @@ uint32_t State::max_entropy() const {
 
 void State::print() const {
     std::cout << "State[gen:" << mGeneration << "|hash:" << std::hash<Words>{}(mWords) << "]: " << mNSolutions << " solutions and " << mWords.size() << " words." << std::endl;
-    //mKeyboard.print();
 }
 
 uint32_t State::entropy_of(const std::string &word) const {
@@ -267,7 +262,7 @@ ScoredEntropy::ScoredEntropy(const WordEntropy &entropy, const Keyboard &keyboar
     }
 }
 
-void State::best_guess() const {
+void State::best_guess(const Keyboard &keyboard) const {
     /* stop! */
     if (mGeneration == 1) {
         std::cout << "Initial best guess is \"trace\"." << std::endl;
@@ -308,7 +303,7 @@ void State::best_guess() const {
 
     std::vector<ScoredEntropy> scored_entropy;
     for (auto jt = mEntropy2.begin(); jt != recommended_guesses_end; jt++) {
-        scored_entropy.push_back(ScoredEntropy(*jt, mKeyboard));
+        scored_entropy.push_back(ScoredEntropy(*jt, keyboard));
     }
     std::sort(scored_entropy.begin(), scored_entropy.end());
 
