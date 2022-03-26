@@ -33,14 +33,11 @@ Iter select_randomly(Iter start, Iter end) {
 State::State(ThreadPool &pool, StateCache &state_cache, const Words &all_words)
     : mPool(pool)
     , mStateCache(state_cache)
-    , mGeneration(1)
     , mAllWords(all_words)
     , mWords(all_words)
     , mFullyComputed(false) {
 
     mNSolutions = std::transform_reduce(mWords.begin(), mWords.end(), 0, std::plus(), [](const Word &word) -> size_t { return word.is_solution() ? 1 : 0; });
-
-    print();
 }
 
 void State::compute_real_entropy() const {
@@ -118,7 +115,6 @@ void State::compute_real_entropy() const {
 State::State(const State &other, const Words &filtered_words, bool do_full_compute)
     : mPool(other.mPool)
     , mStateCache(other.mStateCache)
-    , mGeneration(other.mGeneration + 1)
     , mAllWords(other.mAllWords)
     , mWords(filtered_words)
     , mMaxEntropy(0)
@@ -126,8 +122,6 @@ State::State(const State &other, const Words &filtered_words, bool do_full_compu
 
     /* 1. compute number of solutions among words */
     mNSolutions = std::transform_reduce(mWords.begin(), mWords.end(), 0, std::plus(), [](const Word &word) -> size_t { return word.is_solution() ? 1 : 0; });
-
-    if (do_full_compute) print();
 
     /* 2. compute entropies */
     if (do_full_compute) {
@@ -226,10 +220,6 @@ uint32_t State::max_entropy() const {
     return mMaxEntropy;
 }
 
-void State::print() const {
-    std::cout << "State[gen:" << mGeneration << "|hash:" << std::hash<Words>{}(mWords) << "]: " << mNSolutions << " solutions and " << mWords.size() << " words." << std::endl;
-}
-
 uint32_t State::entropy_of(const std::string &word) const {
     auto it = std::find_if(mEntropy.begin(), mEntropy.end(), [word](const WordEntropy &e){ return e.word().word() == word; });
     if (it == mEntropy.end()) return 0;
@@ -262,9 +252,9 @@ ScoredEntropy::ScoredEntropy(const WordEntropy &entropy, const Keyboard &keyboar
     }
 }
 
-void State::best_guess(const Keyboard &keyboard) const {
+void State::best_guess(int generation, const Keyboard &keyboard) const {
     /* stop! */
-    if (mGeneration == 1) {
+    if (generation == 1) {
         std::cout << "Initial best guess is \"trace\"." << std::endl;
         return;
     }

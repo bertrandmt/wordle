@@ -90,16 +90,18 @@ public:
     std::shared_ptr<State> consider_guess(const std::string &guess, uint32_t match, bool do_full_compute = true) const;
 
     uint32_t max_entropy() const;
-    inline size_t n_solutions() const {
+    inline std::size_t n_solutions() const {
         return mNSolutions;
     }
-    void print() const;
+    inline std::size_t n_words() const {
+        return mWords.size();
+    }
 
     uint32_t entropy_of(const std::string &word) const;
     uint32_t entropy2_of(const std::string &word) const;
     bool words_equal_to(const Words &other_words) const;
 
-    void best_guess(const Keyboard &keyboard) const;
+    void best_guess(int generation, const Keyboard &keyboard) const;
 
 private:
     State(const State &other, const Words &filtered_words, bool do_full_compute = true);
@@ -112,7 +114,6 @@ private:
     ThreadPool &mPool;
     StateCache &mStateCache;
 
-    const int mGeneration;
     const Words &mAllWords;
     const Words mWords;
     size_t mNSolutions;

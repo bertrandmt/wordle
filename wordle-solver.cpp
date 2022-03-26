@@ -2,6 +2,7 @@
 // See LICENSE for details of BSD 3-Clause License
 #include <functional>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -11,6 +12,23 @@
 #include "statecache.h"
 #include "threadpool.h"
 #include "wordlist.h"
+
+struct GameState {
+    GameState(int g, const std::shared_ptr<State> &s, const Keyboard &k)
+        : generation(g)
+        , state(s)
+        , keyboard(k) { }
+
+    std::string toString() {
+        std::stringstream ss;
+        ss << "State[gen:" << generation << "]: S:" << state->n_solutions() << "|W:" << state->n_words() ;
+        return ss.str();
+    }
+
+    const int generation;
+    const std::shared_ptr<State> state;
+    const Keyboard keyboard;
+};
 
 void help(void) {
     std::cout << "Enter your successive guesses, along with the outcome in the format:" << std::endl
@@ -52,8 +70,7 @@ int main(void) {
 
     Keyboard initial_keyboard;
 
-    typedef std::pair<std::shared_ptr<State>, Keyboard> GameState;
-    GameState initial_gamestate = std::make_pair(initial_state, initial_keyboard);
+    GameState initial_gamestate(1, initial_state, initial_keyboard);
 
     enum nStates : int {
         kWordleNStates = 1,
@@ -71,7 +88,8 @@ int main(void) {
     for (auto i = 0; i < current_game; i++) {
         current_game_states[i].push_back(initial_gamestate);
     }
-    initial_state->best_guess(initial_keyboard);
+    std::cout << initial_gamestate.toString() << std::endl;
+    initial_gamestate.state->best_guess(initial_gamestate.generation, initial_gamestate.keyboard);
 
     for (std::string line; std::cout << "] " << std::flush && std::getline(std::cin, line);) {
 
@@ -94,7 +112,8 @@ int main(void) {
                     current_game_states[i].clear();
                     current_game_states[i].push_back(initial_gamestate);
                 }
-                initial_state->print();
+                std::cout << initial_gamestate.toString() << std::endl;
+                initial_gamestate.state->best_guess(initial_gamestate.generation, initial_gamestate.keyboard);
                 continue;
 
             case '^': // back one
@@ -106,8 +125,8 @@ int main(void) {
 
                 for (auto i = 0; i < current_game; i++) {
                     current_game_states[i].pop_back();
-                    current_game_states[i].back().first->print();
-                    current_game_states[i].back().first->best_guess(current_game_states[i].back().second);
+                    std::cout << current_game_states[i].back().toString();
+                    current_game_states[i].back().state->best_guess(current_game_states[i].back().generation, current_game_states[i].back().keyboard);
                 }
                 continue;
 
@@ -131,14 +150,15 @@ int main(void) {
                     current_game_states[i].clear();
                     current_game_states[i].push_back(initial_gamestate);
                 }
-                initial_state->best_guess(initial_keyboard);
+                std::cout << initial_gamestate.toString() << std::endl;
+                initial_gamestate.state->best_guess(initial_gamestate.generation, initial_gamestate.keyboard);
                 continue;
 
             case '?': { // what is the entropy of the word?
                 std::string word = nowsline.substr(1);
                 for (auto i = 0; i < current_game; i++) {
-                    std::cout << "[" << i << "] H(\"" << word << "\") = " << current_game_states[i].back().first->entropy_of(word) << std::endl;
-                    std::cout << "[" << i << "]H2(\"" << word << "\") = " << current_game_states[i].back().first->entropy2_of(word) << std::endl;
+                    std::cout << "[" << i << "] H(\"" << word << "\") = " << current_game_states[i].back().state->entropy_of(word) << std::endl;
+                    std::cout << "[" << i << "]H2(\"" << word << "\") = " << current_game_states[i].back().state->entropy2_of(word) << std::endl;
                 }
                 }
                 continue;
@@ -163,10 +183,10 @@ int main(void) {
         }
 
         for (auto i = 0; i < current_game; i++) {
-            if (current_game_states[i].back().first->n_solutions() == 1) {
+            if (current_game_states[i].back().state->n_solutions() == 1) {
                 auto s = current_game_states[i].back();
                 current_game_states[i].push_back(s);
-                s.first->best_guess(s.second);
+                s.state->best_guess(s.generation, s.keyboard);
             }
             else {
                 if (guess.size() != matches[i].size()) {
@@ -182,12 +202,16 @@ int main(void) {
                 }
 
                 auto p = current_game_states[i].back();
-                auto s = p.first->consider_guess(guess, m.value());
-                auto k = p.second.updateWithGuess(guess, m);
-                current_game_states[i].push_back(std::make_pair(s, k));
-                s->best_guess(k);
+                auto s = p.state->consider_guess(guess, m.value());
+                auto k = p.keyboard.updateWithGuess(guess, m);
+                GameState gs(p.generation + 1, s, k);
+                std::cout << gs.toString() << std::endl;
+                current_game_states[i].push_back(gs);
+                s->best_guess(gs.generation, k);
             }
         }
+
+        std::cout << state_cache.report() << std::endl;
     }
 
     pool.done();
