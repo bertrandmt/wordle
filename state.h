@@ -86,8 +86,8 @@ class StateCache;
 
 class State {
 public:
-    State(ThreadPool &pool, StateCache & state_cache, const Words &all_words);
-    State &consider_guess(const std::string &guess, uint32_t match, bool do_print = true) const;
+    State(ThreadPool &pool, StateCache &state_cache, const Words &all_words);
+    std::shared_ptr<State> consider_guess(const std::string &guess, uint32_t match, bool do_full_compute = true) const;
 
     uint32_t max_entropy() const;
     inline size_t n_solutions() const {
@@ -102,7 +102,7 @@ public:
     void best_guess() const;
 
 private:
-    State(const State &other, const Words &filtered_words, const Keyboard &keyboard, bool do_print = true);
+    State(const State &other, const Words &filtered_words, const Keyboard &keyboard, bool do_full_compute = true);
 
     uint32_t compute_entropy_of(const std::string &word) const;
     uint32_t compute_entropy2_of(const std::string &word) const;
@@ -120,7 +120,7 @@ private:
     uint32_t mMaxEntropy;
     mutable std::vector<WordEntropy> mEntropy;
     mutable std::vector<WordEntropy> mEntropy2;
-    mutable bool mRealEntropyComputed;
+    mutable bool mFullyComputed;
 
     Keyboard mKeyboard;
 };

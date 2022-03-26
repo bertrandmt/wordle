@@ -7,24 +7,24 @@
 #include "state.h"
 #include "statecache.h"
 
-StateCache::iterator StateCache::find(const Words &key) {
+bool StateCache::contains(const Words &key) const {
     std::shared_lock sl(mMutex);
 
-    return mCache.find(key);
+    return mCache.contains(key);
 }
 
-StateCache::iterator StateCache::end() noexcept {
+std::shared_ptr<State> StateCache::at(const Words &key) {
     std::shared_lock sl(mMutex);
 
-    return mCache.end();
+    return mCache.at(key);
 }
 
-std::pair<StateCache::iterator, bool> StateCache::insert(Words &key, State value) {
+std::pair<StateCache::iterator, bool> StateCache::insert(const Words &key, std::shared_ptr<State> value) {
     std::unique_lock ul(mMutex);
 
     auto it = mCache.insert(std::make_pair(key, value));
     if (!it.second) {
-        assert(it.first->second.words_equal_to(key));
+        assert(it.first->second->words_equal_to(key));
 #if DEBUG_STATE_CACHE
         std::cout << "FAILED to insert state with filtered words: " << std::endl;
         std::for_each(key.begin(), key.end(), [](const Word &w) { std::cout << "\"" << w.word() << "\", "; });

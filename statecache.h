@@ -2,6 +2,7 @@
 // See LICENSE for details of BSD 3-Clause License
 #pragma once
 
+#include <memory>
 #include <shared_mutex>
 #include <sstream>
 #include <unordered_map>
@@ -33,13 +34,13 @@ class StateCache {
 public:
     inline StateCache() { }
 
-    typedef std::unordered_map<Words, State>::iterator        iterator;
+    typedef std::unordered_map<Words, std::shared_ptr<State>>::iterator        iterator;
 
-    iterator find(const Words &key);
-    std::pair<iterator, bool> insert(Words &key, State value);
-    iterator end() noexcept;
+    bool contains(const Words &key) const;
+    std::shared_ptr<State> at(const Words &key);
+    std::pair<iterator, bool> insert(const Words &key, std::shared_ptr<State> value);
 
 private:
-    std::unordered_map<Words, State> mCache;
-    std::shared_mutex mMutex;
+    std::unordered_map<Words, std::shared_ptr<State>> mCache;
+    mutable std::shared_mutex mMutex;
 };

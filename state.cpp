@@ -36,7 +36,7 @@ State::State(ThreadPool &pool, StateCache &state_cache, const Words &all_words)
     , mGeneration(1)
     , mAllWords(all_words)
     , mWords(all_words)
-    , mRealEntropyComputed(false) {
+    , mFullyComputed(false) {
 
     mNSolutions = std::transform_reduce(mWords.begin(), mWords.end(), 0, std::plus(), [](const Word &word) -> size_t { return word.is_solution() ? 1 : 0; });
 
@@ -50,7 +50,9 @@ void State::compute_real_entropy() const {
 
     const size_t num_blocks = mPool.num_threads();
 
+#if DEBUG_ENTROPY
     std::cout << "Computing entropy..." << std::flush;
+#endif // DEBUG_ENTROPY
     mEntropy.resize(mAllWords.size());
     size_t block_sz = mEntropy.size() / num_blocks + 1;
 
@@ -64,7 +66,9 @@ void State::compute_real_entropy() const {
                 {
                     std::lock_guard<std::mutex> lk(lock);
                     ndone += 1;
+#if DEBUG_ENTROPY
                     std::cout << "." << std::flush;
+#endif // DEBUG_ENTROPY
                 }
                 cond.notify_all();
             });
@@ -92,7 +96,9 @@ void State::compute_real_entropy() const {
                 {
                     std::lock_guard<std::mutex> lk(lock);
                     ndone += 1;
+#if DEBUG_ENTROPY
                     std::cout << "." << std::flush;
+#endif // DEBUG_ENTROPY
                 }
                 cond.notify_all();
             });
@@ -101,30 +107,32 @@ void State::compute_real_entropy() const {
         std::unique_lock<std::mutex> lk(lock);
         cond.wait(lk, [&ndone, num_blocks]() { return ndone == num_blocks; });
     }
+#if DEBUG_ENTROPY
     std::cout << std::endl;
+#endif // DEBUG_ENTROPY
 
     /* 4. sort entropy2 decreasing */
     std::sort(mEntropy2.begin(), mEntropy2.end());
 }
 
-State::State(const State &other, const Words &filtered_words, const Keyboard &keyboard, bool do_print)
+State::State(const State &other, const Words &filtered_words, const Keyboard &keyboard, bool do_full_compute)
     : mPool(other.mPool)
     , mStateCache(other.mStateCache)
     , mGeneration(other.mGeneration + 1)
     , mAllWords(other.mAllWords)
     , mWords(filtered_words)
     , mMaxEntropy(0)
-    , mRealEntropyComputed(do_print)
+    , mFullyComputed(do_full_compute)
     , mKeyboard(keyboard) {
 
 
     /* 1. compute number of solutions among words */
     mNSolutions = std::transform_reduce(mWords.begin(), mWords.end(), 0, std::plus(), [](const Word &word) -> size_t { return word.is_solution() ? 1 : 0; });
 
-    if (do_print) print();
+    if (do_full_compute) print();
 
     /* 2. compute entropies */
-    if (do_print) {
+    if (do_full_compute) {
         compute_real_entropy();
     }
     else {
@@ -137,9 +145,9 @@ State::State(const State &other, const Words &filtered_words, const Keyboard &ke
                                                                                [](const WordEntropy &e) -> uint32_t { return e.entropy(); });
 }
 
-State &State::consider_guess(const std::string &guess, uint32_t match, bool do_print) const {
+std::shared_ptr<State> State::consider_guess(const std::string &guess, uint32_t match, bool do_full_compute) const {
     Match m(guess, match);
-    if (do_print) {
+    if (do_full_compute) {
         std::cout << "Considering guess \"" << guess << "\" with match " << m.toString() << std::endl;
     }
 
@@ -159,51 +167,22 @@ State &State::consider_guess(const std::string &guess, uint32_t match, bool do_p
 
     Keyboard updated_keyboard = mKeyboard.updateWithGuess(guess, m);
 
-    auto it = mStateCache.find(filtered_words);
-    if (it != mStateCache.end()) {
+    if (mStateCache.contains(filtered_words)) {
 #if DEBUG_STATE_CACHE
         std::cout << "+" << std::flush;
 #endif // DEBUG_STATE_CACHE
 
-        return it->second;
+        return mStateCache.at(filtered_words);
     }
     else {
 #if DEBUG_STATE_CACHE
         std::cout << "-" << std::flush;
 #endif // DEBUG_STATE_CACHE
 
-        State s(*this, filtered_words, updated_keyboard, do_print);
-        auto jt = mStateCache.insert(filtered_words, std::move(s));
+        std::shared_ptr<State> s(new State(*this, filtered_words, updated_keyboard, do_full_compute));
+        auto jt = mStateCache.insert(filtered_words, s);
         return jt.first->second;
     }
-//    {
-//        std::shared_lock sl(mStateCacheMutex);
-//
-//        auto it = mStateCache.find(filtered_words);
-//        if (it != mStateCache.end()) {
-//            return it->second;
-//        }
-//        else {
-//            sl.unlock(); // explicitly unlock...
-//
-//            State s(*this, filtered_words, updated_keyboard, do_print);
-//
-//            {
-//                std::unique_lock ul(mStateCacheMutex); // in order to acquire an exclusive lock to the mutex
-//                auto jt = mStateCache.insert(std::make_pair(filtered_words, std::move(s)));
-//                if (!jt.second) {
-//                    assert(std::equal_to<Words>{}(filtered_words, jt.first->second.mWords));
-//#if DEBUG_STATE_CACHE
-//                    std::cout << "FAILED to insert state with filtered words: " << std::endl;
-//                    std::for_each(filtered_words.begin(), filtered_words.end(), [](const Word &w) { std::cout << "\"" << w.word() << "\", "; });
-//                    std::cout << std::endl
-//                              << "It was probably inserted concurrently; continuing" << std::endl;
-//#endif // DEBUG_STATE_CACHE
-//                }
-//                return jt.first->second;
-//            }
-//        }
-//    }
 }
 
 uint32_t State::compute_entropy_of(const std::string &word) const {
@@ -240,7 +219,7 @@ uint32_t State::compute_entropy2_of(const std::string &word) const {
         if (match_counts[match] == 0) continue;
 
         auto s = consider_guess(word, match, false);
-        auto H_2 = s.max_entropy();
+        auto H_2 = s->max_entropy();
         double Pxi = (double)match_counts[match] / mNSolutions;
         H += Pxi * H_2;
     }
@@ -305,9 +284,9 @@ void State::best_guess() const {
         return;
     }
 
-    if (!mRealEntropyComputed) {
+    if (!mFullyComputed) {
         compute_real_entropy();
-        mRealEntropyComputed = true;
+        mFullyComputed = true;
     }
 
     if (mNSolutions <= MAX_N_SOLUTIONS_PRINTED) {
