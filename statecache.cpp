@@ -1,6 +1,7 @@
 // Copyright (c) 2022, Bertrand Mollinier Toublet
 // See LICENSE for details of BSD 3-Clause License
 #include <cassert>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 
@@ -40,6 +41,10 @@ std::pair<StateCache::iterator, bool> StateCache::insert(const Words &key, std::
 #endif // DEBUG_STATE_CACHE
     }
     else {
+        if (!mInitialState.get()) {
+            mInitialState = value;
+        }
+
         mTotalInserts++;
         mInsertsSinceLastReport++;
     }
@@ -59,4 +64,26 @@ std::string StateCache::report() {
     mInsertsSinceLastReport = 0;
 
     return ss.str();
+}
+
+void StateCache::serialize(std::ostream &os) const {
+    os << mCache.size() << " ";
+    std::for_each(mCache.begin(), mCache.end(), [&os](const auto &cache_entry) { cache_entry.second->serialize(os); });
+}
+
+StateCache::ptr StateCache::unserialize(StateCache::ptr &cache, std::istream &is, ThreadPool &pool, const Words &all_words) {
+    std::size_t n_states;
+    is >> n_states;
+
+    std::shared_ptr<State> initial_state = State::unserialize(is, pool, cache, all_words);
+    auto p = cache->insert(initial_state->words(), initial_state);
+    assert(p.second);
+
+    for (size_t i = 1; i < n_states; i++) {
+        std::shared_ptr<State> state = State::unserialize(is, pool, cache, all_words);
+        p = cache->insert(state->words(), state);
+        assert(p.second);
+    }
+
+    return cache;
 }

@@ -30,7 +30,7 @@ Iter select_randomly(Iter start, Iter end) {
 
 } // namespace anonymous
 
-State::State(ThreadPool &pool, StateCache &state_cache, const Words &all_words)
+State::State(ThreadPool &pool, const StateCache::ptr &state_cache, const Words &all_words)
     : mPool(pool)
     , mStateCache(state_cache)
     , mAllWords(all_words)
@@ -134,10 +134,10 @@ State::State(const State &other, const Words &filtered_words, bool do_full_compu
 
     /* 3. compute max entropy */
     mMaxEntropy = std::transform_reduce(mEntropy.begin(), mEntropy.end(), 0, [](uint32_t max_h, uint32_t h) { return std::max(h, max_h); },
-                                                                               [](const WordEntropy &e) -> uint32_t { return e.entropy(); });
+                                                                             [](const WordEntropy &e) -> uint32_t { return e.entropy(); });
 }
 
-std::shared_ptr<State> State::consider_guess(const std::string &guess, uint32_t match, bool do_full_compute) const {
+State::ptr State::consider_guess(const std::string &guess, uint32_t match, bool do_full_compute) const {
     Match m(guess, match);
     if (do_full_compute) {
         std::cout << "Considering guess \"" << guess << "\" with match " << m.toString() << std::endl;
@@ -157,20 +157,20 @@ std::shared_ptr<State> State::consider_guess(const std::string &guess, uint32_t 
                return n.value() == match;
             });
 
-    if (mStateCache.contains(filtered_words)) {
+    if (mStateCache->contains(filtered_words)) {
 #if DEBUG_STATE_CACHE
         std::cout << "+" << std::flush;
 #endif // DEBUG_STATE_CACHE
 
-        return mStateCache.at(filtered_words);
+        return mStateCache->at(filtered_words);
     }
     else {
 #if DEBUG_STATE_CACHE
         std::cout << "-" << std::flush;
 #endif // DEBUG_STATE_CACHE
 
-        std::shared_ptr<State> s(new State(*this, filtered_words, do_full_compute));
-        auto jt = mStateCache.insert(filtered_words, s);
+        State::ptr s(new State(*this, filtered_words, do_full_compute));
+        auto jt = mStateCache->insert(filtered_words, s);
         return jt.first->second;
     }
 }
@@ -312,4 +312,64 @@ void State::best_guess(int generation, const Keyboard &keyboard) const {
         std::cout << "\"" << it->entropy().word().word() << "\"";
     }
     std::cout << ") " << std::endl;
+}
+
+void State::serialize(std::ostream & os) const {
+    os << mFullyComputed << " "
+       << mWords.size() << " ";
+    std::for_each(mWords.begin(), mWords.end(), [&os](const Word &w) { w.serialize(os); os << " "; });
+    os << mEntropy.size() << " ";
+    std::for_each(mEntropy.begin(), mEntropy.end(), [&os](const WordEntropy &e) { e.serialize(os); os << " "; });
+    if (mFullyComputed) {
+        os << mEntropy2.size() << " ";
+        std::for_each(mEntropy2.begin(), mEntropy2.end(), [&os](const WordEntropy &e) { e.serialize(os); os << " "; });
+    }
+}
+
+State::State(ThreadPool &pool, const StateCache::ptr &cache, const Words &all_words,
+             const Words &words, const std::vector<WordEntropy> &entropy, const std::vector<WordEntropy> &entropy2, bool fully_computed)
+    : mPool(pool)
+    , mStateCache(cache)
+    , mAllWords(all_words)
+    , mWords(words)
+    , mEntropy(entropy)
+    , mEntropy2(entropy2)
+    , mFullyComputed(fully_computed) {
+
+    mNSolutions = std::transform_reduce(mWords.begin(), mWords.end(), 0, std::plus(), [](const Word &word) -> size_t { return word.is_solution() ? 1 : 0; });
+
+    mMaxEntropy = std::transform_reduce(mEntropy.begin(), mEntropy.end(), 0, [](uint32_t max_h, uint32_t h) { return std::max(h, max_h); },
+                                                                             [](const WordEntropy &e) -> uint32_t { return e.entropy(); });
+}
+
+State::ptr State::unserialize(std::istream &is, ThreadPool &pool, const StateCache::ptr &cache, const Words &all_words) {
+    bool fully_computed = false;
+    std::size_t n_words = 0;
+
+    is >> fully_computed >> n_words;
+
+    Words words;
+    for (std::size_t i = 0; i < n_words; i++) {
+        words.push_back(Word::unserialize(is));
+    }
+
+    std::size_t n_entropy;
+    is >> n_entropy;
+
+    std::vector<WordEntropy> entropy;
+    for (std::size_t i = 0; i < n_entropy; i++) {
+        entropy.push_back(WordEntropy::unserialize(is));
+    }
+
+    std::vector<WordEntropy> entropy2;
+    if (fully_computed) {
+        std::size_t n_entropy2;
+        is >> n_entropy2;
+
+        for (std::size_t i = 0; i < n_entropy2; i++) {
+            entropy2.push_back(WordEntropy::unserialize(is));
+        }
+    }
+
+    return State::ptr(new State(pool, cache, all_words, words, entropy, entropy2, fully_computed));
 }

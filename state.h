@@ -27,12 +27,33 @@ public:
         return mIsSolution;
     }
 
+    inline void serialize(std::ostream &os) const {
+        os << mIsSolution << " " << mWord.size() << mWord ;
+    }
+
+    static inline Word unserialize(std::istream &is) {
+        bool is_solution;
+        std::size_t word_len;
+
+        is >> is_solution >> word_len;
+
+        if (word_len != 5) {
+            throw new std::runtime_error("bad string size value");
+        }
+
+        char w[word_len];
+        is.read(w, word_len);
+        std::string word(w, word_len);
+
+        return Word(word, is_solution);
+    }
+
 private:
     std::string mWord;
     bool mIsSolution;
 };
 
-typedef std::vector<const Word> Words;
+typedef std::vector<Word> Words;
 
 class WordEntropy {
 public:
@@ -52,10 +73,23 @@ public:
         return mEntropy;
     }
 
-    bool operator<(const WordEntropy &other) const {
+    inline bool operator<(const WordEntropy &other) const {
         return other.mEntropy < mEntropy; // inverted, to achieve decreasing order
     }
 
+    inline void serialize(std::ostream &os) const {
+        mWord.serialize(os);
+        os << " " << mEntropy;
+    }
+
+    static inline WordEntropy unserialize(std::istream &is) {
+        Word word = Word::unserialize(is);
+
+        uint32_t entropy;
+        is >> entropy;
+
+        return WordEntropy(word, entropy);
+    }
 private:
     Word mWord;
     uint32_t mEntropy;
@@ -86,12 +120,18 @@ class StateCache;
 
 class State {
 public:
-    State(ThreadPool &pool, StateCache &state_cache, const Words &all_words);
-    std::shared_ptr<State> consider_guess(const std::string &guess, uint32_t match, bool do_full_compute = true) const;
+    typedef std::shared_ptr<State> ptr;
+
+    State(ThreadPool &pool, const std::shared_ptr<StateCache> &state_cache, const Words &all_words);
+    ptr consider_guess(const std::string &guess, uint32_t match, bool do_full_compute = true) const;
+    static ptr unserialize(std::istream &is, ThreadPool &pool, const std::shared_ptr<StateCache> &cache, const Words &all_words);
 
     uint32_t max_entropy() const;
     inline std::size_t n_solutions() const {
         return mNSolutions;
+    }
+    const Words &words() const {
+        return mWords;
     }
     inline std::size_t n_words() const {
         return mWords.size();
@@ -103,8 +143,12 @@ public:
 
     void best_guess(int generation, const Keyboard &keyboard) const;
 
+    void serialize(std::ostream &os) const;
+
 private:
     State(const State &other, const Words &filtered_words, bool do_full_compute = true);
+    State(ThreadPool &pool, const std::shared_ptr<StateCache> &cache, const Words &all_words,
+          const Words &words, const std::vector<WordEntropy> &entropy, const std::vector<WordEntropy> &entropy2, bool fully_computed);
 
     uint32_t compute_entropy_of(const std::string &word) const;
     uint32_t compute_entropy2_of(const std::string &word) const;
@@ -112,7 +156,7 @@ private:
     void compute_real_entropy() const;
 
     ThreadPool &mPool;
-    StateCache &mStateCache;
+    std::shared_ptr<StateCache> mStateCache;
 
     const Words &mAllWords;
     const Words mWords;

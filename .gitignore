@@ -33,3 +33,4 @@
 
 wordle-solver
 wordle.txt
+wordle_state_cache.txt

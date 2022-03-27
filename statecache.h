@@ -32,6 +32,10 @@ struct std::equal_to<Words> {
 
 class StateCache {
 public:
+    typedef std::shared_ptr<StateCache> ptr;
+    typedef std::unordered_map<Words, State::ptr> map;
+    typedef map::iterator iterator;
+
     inline StateCache()
         : mTotalHits(0)
         , mTotalMisses(0)
@@ -39,18 +43,28 @@ public:
         , mHitsSinceLastReport(0)
         , mMissesSinceLastReport(0)
         , mInsertsSinceLastReport(0) { }
-
-    typedef std::unordered_map<Words, std::shared_ptr<State>>::iterator iterator;
+    static ptr unserialize(ptr &cache, std::istream &is, ThreadPool &pool, const Words &all_words);
 
     bool contains(const Words &key) const;
-    std::shared_ptr<State> at(const Words &key);
-    std::pair<iterator, bool> insert(const Words &key, std::shared_ptr<State> value);
+    State::ptr at(const Words &key);
+    std::pair<iterator, bool> insert(const Words &key, State::ptr value);
+
+    State::ptr initial_state() const {
+        return mInitialState;
+    }
 
     std::string report();
 
+    void serialize(std::ostream &os) const;
+
 private:
-    std::unordered_map<Words, std::shared_ptr<State>> mCache;
+    inline void set_cache(const map &cache) {
+        mCache = cache;
+    }
+
+    map mCache;
     mutable std::shared_mutex mMutex;
+    std::shared_ptr<State> mInitialState;
 
     mutable std::size_t mTotalHits;
     mutable std::size_t mTotalMisses;

@@ -1,6 +1,7 @@
 // Copyright (c) 2022, Bertrand Mollinier Toublet
 // See LICENSE for details of BSD 3-Clause License
 #include <functional>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -14,19 +15,17 @@
 #include "wordlist.h"
 
 struct GameState {
-    GameState(int g, const std::shared_ptr<State> &s, const Keyboard &k)
+    GameState(int g, const State::ptr &s, const Keyboard &k)
         : generation(g)
         , state(s)
         , keyboard(k) { }
 
-    std::string toString() {
-        std::stringstream ss;
-        ss << "State[gen:" << generation << "]: S:" << state->n_solutions() << "|W:" << state->n_words() ;
-        return ss.str();
+    inline void serialize(std::ostream &os) const {
+        os << "State[gen:" << generation << "]: S:" << state->n_solutions() << "|W:" << state->n_words() << std::endl;
     }
 
     const int generation;
-    const std::shared_ptr<State> state;
+    const State::ptr state;
     const Keyboard keyboard;
 };
 
@@ -41,36 +40,35 @@ void help(void) {
 }
 
 int main(void) {
-#if 0
-    std::cout << Match("clump", "perch").toString() << std::endl;
-    std::cout << Match("perch", "clump").toString() << std::endl;
-    std::cout << Match("tuner", "exits").toString() << std::endl;
-    std::cout << Match("exits", "tuner").toString() << std::endl;
-    std::cout << Match("doozy", "yahoo").toString() << std::endl;
-    std::cout << Match("preen", "hyper").toString() << std::endl;
-    std::cout << Match("hyper", "upper").toString() << std::endl;
-    std::cout << Match("ulama", "offal").toString() << std::endl;
-    return 1;
-#endif
-
     ThreadPool pool;
-    StateCache state_cache;
+    StateCache::ptr state_cache(new StateCache);
 
-    std::vector<const Word> words;
+    Words all_words;
     for (auto w : solutions) {
-        words.push_back(Word(w, true));
+        all_words.push_back(Word(w, true));
     }
     for (auto w : allowed) {
-        words.push_back(Word(w, false));
+        all_words.push_back(Word(w, false));
     }
 
-    std::shared_ptr<State> initial_state(new State(pool, state_cache, words));
-    auto p = state_cache.insert(words, initial_state);
-    assert(p.second);
-
+    std::cout << "Loading state cache..." << std::flush;
+    std::ifstream ifs;
+    ifs.open("wordle_state_cache.txt");
+    if (ifs.fail()) {
+        std::cout << " failed: initializing from scratch" << std::endl;
+        State::ptr initial_state(new State(pool, state_cache, all_words));
+        auto p = state_cache->insert(all_words, initial_state);
+        assert(p.second);
+    }
+    else {
+        auto c = StateCache::unserialize(state_cache, ifs, pool, all_words);
+        assert(c == state_cache);
+        ifs.close();
+        std::cout << " done" << std::endl;
+    }
     Keyboard initial_keyboard;
 
-    GameState initial_gamestate(1, initial_state, initial_keyboard);
+    GameState initial_gamestate(1, state_cache->initial_state(), initial_keyboard);
 
     enum nStates : int {
         kWordleNStates = 1,
@@ -88,7 +86,7 @@ int main(void) {
     for (auto i = 0; i < current_game; i++) {
         current_game_states[i].push_back(initial_gamestate);
     }
-    std::cout << initial_gamestate.toString() << std::endl;
+    initial_gamestate.serialize(std::cout);
     initial_gamestate.state->best_guess(initial_gamestate.generation, initial_gamestate.keyboard);
 
     for (std::string line; std::cout << "] " << std::flush && std::getline(std::cin, line);) {
@@ -112,7 +110,7 @@ int main(void) {
                     current_game_states[i].clear();
                     current_game_states[i].push_back(initial_gamestate);
                 }
-                std::cout << initial_gamestate.toString() << std::endl;
+                initial_gamestate.serialize(std::cout);
                 initial_gamestate.state->best_guess(initial_gamestate.generation, initial_gamestate.keyboard);
                 continue;
 
@@ -125,7 +123,7 @@ int main(void) {
 
                 for (auto i = 0; i < current_game; i++) {
                     current_game_states[i].pop_back();
-                    std::cout << current_game_states[i].back().toString();
+                    current_game_states[i].back().serialize(std::cout);
                     current_game_states[i].back().state->best_guess(current_game_states[i].back().generation, current_game_states[i].back().keyboard);
                 }
                 continue;
@@ -150,7 +148,7 @@ int main(void) {
                     current_game_states[i].clear();
                     current_game_states[i].push_back(initial_gamestate);
                 }
-                std::cout << initial_gamestate.toString() << std::endl;
+                initial_gamestate.serialize(std::cout);
                 initial_gamestate.state->best_guess(initial_gamestate.generation, initial_gamestate.keyboard);
                 continue;
 
@@ -205,15 +203,64 @@ int main(void) {
                 auto s = p.state->consider_guess(guess, m.value());
                 auto k = p.keyboard.updateWithGuess(guess, m);
                 GameState gs(p.generation + 1, s, k);
-                std::cout << gs.toString() << std::endl;
+                gs.serialize(std::cout);
                 current_game_states[i].push_back(gs);
                 s->best_guess(gs.generation, k);
             }
         }
 
-        std::cout << state_cache.report() << std::endl;
+        std::cout << state_cache->report() << std::endl;
     }
 
+    std::cout << "Persisting state cache..." << std::flush;
+    std::ofstream ofs;
+    ofs.open("wordle_state_cache.txt", std::ofstream::trunc);
+    state_cache->serialize(ofs);
+    ofs.close();
+    std::cout << " done" << std::endl;
+
     pool.done();
+
     return 0;
 }
+
+
+#if 0
+    std::cout << Match("clump", "perch").toString() << std::endl;
+    std::cout << Match("perch", "clump").toString() << std::endl;
+    std::cout << Match("tuner", "exits").toString() << std::endl;
+    std::cout << Match("exits", "tuner").toString() << std::endl;
+    std::cout << Match("doozy", "yahoo").toString() << std::endl;
+    std::cout << Match("preen", "hyper").toString() << std::endl;
+    std::cout << Match("hyper", "upper").toString() << std::endl;
+    std::cout << Match("ulama", "offal").toString() << std::endl;
+    return 1;
+#endif
+#if 0
+    {
+        std::string input("1 5cigar");
+        std::istringstream is(input);
+        Word w = Word::unserialize(is);
+        w.serialize(std::cout);
+        std::cout << std::endl;
+    }
+    {
+        std::string input("1 5cigar 693");
+        std::istringstream is(input);
+        WordEntropy we = WordEntropy::unserialize(is);
+        we.serialize(std::cout);
+        std::cout << std::endl;
+    }
+    return 1;
+#endif
+
+#if 0
+    {
+        std::string input("0 4 1 5actor 0 5carts 0 5curat 0 5scrat 4 1 5actor 0 0 5carts 0 0 5curat 0 0 5scrat 0 ");
+        std::istringstream is(input);
+        State::ptr state = State::unserialize(is, initial_state);
+        state->serialize(std::cout);
+    }
+    pool.done();
+    return 1;
+#endif
