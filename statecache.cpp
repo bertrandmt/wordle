@@ -56,7 +56,8 @@ std::string StateCache::report() {
     std::size_t events_since_last_report = mHitsSinceLastReport + mMissesSinceLastReport;
 
     std::stringstream ss;
-    ss << "T:H:" << mTotalHits           << "|M:" << mTotalMisses           << "|I:" << mTotalInserts           << " / " << total_events << std::endl
+    ss << "E:" << mCache.size() << std::endl
+       << "T:H:" << mTotalHits           << "|M:" << mTotalMisses           << "|I:" << mTotalInserts           << " / " << total_events << std::endl
        << "S:H:" << mHitsSinceLastReport << "|M:" << mMissesSinceLastReport << "|I:" << mInsertsSinceLastReport << " / " << events_since_last_report;
 
     mHitsSinceLastReport = 0;
@@ -67,7 +68,7 @@ std::string StateCache::report() {
 }
 
 void StateCache::serialize(std::ostream &os) const {
-    os << mCache.size() << " ";
+    os << mCache.size() - 1 << " ";
     std::for_each(mCache.begin(), mCache.end(), [&os, this](const auto &cache_entry) {
             if (cache_entry.second == mInitialState) { // skip initial state
                 return;

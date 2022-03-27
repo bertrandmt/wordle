@@ -53,6 +53,14 @@ public:
         return mInitialState;
     }
 
+    inline void reset_stats() {
+        mTotalHits = 0;
+        mTotalMisses = 0;
+        mTotalInserts = 0;
+        mHitsSinceLastReport = 0;
+        mMissesSinceLastReport = 0;
+        mInsertsSinceLastReport = 0;
+    }
     std::string report();
 
     void serialize(std::ostream &os) const;

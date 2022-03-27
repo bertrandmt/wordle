@@ -67,6 +67,7 @@ int main(void) {
         ifs.close();
         std::cout << " done" << std::endl;
 
+        state_cache->reset_stats();
         std::cout << state_cache->report() << std::endl;
     }
     Keyboard initial_keyboard;
