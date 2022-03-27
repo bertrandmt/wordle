@@ -43,7 +43,7 @@ public:
         , mHitsSinceLastReport(0)
         , mMissesSinceLastReport(0)
         , mInsertsSinceLastReport(0) { }
-    static ptr unserialize(ptr &cache, std::istream &is, ThreadPool &pool, const Words &all_words);
+    static ptr unserialize(ptr &cache, std::istream &is);
 
     bool contains(const Words &key) const;
     State::ptr at(const Words &key);

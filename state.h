@@ -124,7 +124,7 @@ public:
 
     State(ThreadPool &pool, const std::shared_ptr<StateCache> &state_cache, const Words &all_words);
     ptr consider_guess(const std::string &guess, uint32_t match, bool do_full_compute = true) const;
-    static ptr unserialize(std::istream &is, ThreadPool &pool, const std::shared_ptr<StateCache> &cache, const Words &all_words);
+    static ptr unserialize(std::istream &is, const std::shared_ptr<StateCache> &cache);
 
     uint32_t max_entropy() const;
     inline std::size_t n_solutions() const {
@@ -147,8 +147,7 @@ public:
 
 private:
     State(const State &other, const Words &filtered_words, bool do_full_compute = true);
-    State(ThreadPool &pool, const std::shared_ptr<StateCache> &cache, const Words &all_words,
-          const Words &words, const std::vector<WordEntropy> &entropy, const std::vector<WordEntropy> &entropy2, bool fully_computed);
+    State(const ptr &other, const Words &words, const std::vector<WordEntropy> &entropy, const std::vector<WordEntropy> &entropy2, bool fully_computed);
 
     uint32_t compute_entropy_of(const std::string &word) const;
     uint32_t compute_entropy2_of(const std::string &word) const;

@@ -326,11 +326,10 @@ void State::serialize(std::ostream & os) const {
     }
 }
 
-State::State(ThreadPool &pool, const StateCache::ptr &cache, const Words &all_words,
-             const Words &words, const std::vector<WordEntropy> &entropy, const std::vector<WordEntropy> &entropy2, bool fully_computed)
-    : mPool(pool)
-    , mStateCache(cache)
-    , mAllWords(all_words)
+State::State(const State::ptr &other, const Words &words, const std::vector<WordEntropy> &entropy, const std::vector<WordEntropy> &entropy2, bool fully_computed)
+    : mPool(other->mPool)
+    , mStateCache(other->mStateCache)
+    , mAllWords(other->mAllWords)
     , mWords(words)
     , mEntropy(entropy)
     , mEntropy2(entropy2)
@@ -342,7 +341,7 @@ State::State(ThreadPool &pool, const StateCache::ptr &cache, const Words &all_wo
                                                                              [](const WordEntropy &e) -> uint32_t { return e.entropy(); });
 }
 
-State::ptr State::unserialize(std::istream &is, ThreadPool &pool, const StateCache::ptr &cache, const Words &all_words) {
+State::ptr State::unserialize(std::istream &is, const StateCache::ptr &cache) {
     bool fully_computed = false;
     std::size_t n_words = 0;
 
@@ -371,5 +370,5 @@ State::ptr State::unserialize(std::istream &is, ThreadPool &pool, const StateCac
         }
     }
 
-    return State::ptr(new State(pool, cache, all_words, words, entropy, entropy2, fully_computed));
+    return State::ptr(new State(cache->initial_state(), words, entropy, entropy2, fully_computed));
 }

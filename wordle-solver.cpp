@@ -51,20 +51,23 @@ int main(void) {
         all_words.push_back(Word(w, false));
     }
 
+    State::ptr initial_state(new State(pool, state_cache, all_words));
+    auto p = state_cache->insert(all_words, initial_state);
+    assert(p.second);
+
     std::cout << "Loading state cache..." << std::flush;
     std::ifstream ifs;
     ifs.open("wordle_state_cache.txt");
     if (ifs.fail()) {
         std::cout << " failed: initializing from scratch" << std::endl;
-        State::ptr initial_state(new State(pool, state_cache, all_words));
-        auto p = state_cache->insert(all_words, initial_state);
-        assert(p.second);
     }
     else {
-        auto c = StateCache::unserialize(state_cache, ifs, pool, all_words);
+        auto c = StateCache::unserialize(state_cache, ifs);
         assert(c == state_cache);
         ifs.close();
         std::cout << " done" << std::endl;
+
+        std::cout << state_cache->report() << std::endl;
     }
     Keyboard initial_keyboard;
 

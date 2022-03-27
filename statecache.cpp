@@ -15,7 +15,7 @@ bool StateCache::contains(const Words &key) const {
     return mCache.contains(key);
 }
 
-std::shared_ptr<State> StateCache::at(const Words &key) {
+State::ptr StateCache::at(const Words &key) {
     std::shared_lock sl(mMutex);
 
     auto s = mCache.at(key);
@@ -24,7 +24,7 @@ std::shared_ptr<State> StateCache::at(const Words &key) {
     return s;
 }
 
-std::pair<StateCache::iterator, bool> StateCache::insert(const Words &key, std::shared_ptr<State> value) {
+std::pair<StateCache::iterator, bool> StateCache::insert(const Words &key, State::ptr value) {
     std::unique_lock ul(mMutex);
 
     mTotalMisses++;
@@ -68,20 +68,21 @@ std::string StateCache::report() {
 
 void StateCache::serialize(std::ostream &os) const {
     os << mCache.size() << " ";
-    std::for_each(mCache.begin(), mCache.end(), [&os](const auto &cache_entry) { cache_entry.second->serialize(os); });
+    std::for_each(mCache.begin(), mCache.end(), [&os, this](const auto &cache_entry) {
+            if (cache_entry.second == mInitialState) { // skip initial state
+                return;
+            }
+            cache_entry.second->serialize(os);
+        });
 }
 
-StateCache::ptr StateCache::unserialize(StateCache::ptr &cache, std::istream &is, ThreadPool &pool, const Words &all_words) {
+StateCache::ptr StateCache::unserialize(StateCache::ptr &cache, std::istream &is) {
     std::size_t n_states;
     is >> n_states;
 
-    std::shared_ptr<State> initial_state = State::unserialize(is, pool, cache, all_words);
-    auto p = cache->insert(initial_state->words(), initial_state);
-    assert(p.second);
-
-    for (size_t i = 1; i < n_states; i++) {
-        std::shared_ptr<State> state = State::unserialize(is, pool, cache, all_words);
-        p = cache->insert(state->words(), state);
+    for (size_t i = 0; i < n_states; i++) {
+        State::ptr state = State::unserialize(is, cache);
+        auto p = cache->insert(state->words(), state);
         assert(p.second);
     }
 
