@@ -3,6 +3,7 @@
 #include <cassert>
 #include <fstream>
 #include <iostream>
+#include <numeric>
 #include <sstream>
 
 #include "config.h"
@@ -55,8 +56,10 @@ std::string StateCache::report() {
     std::size_t total_events = mTotalHits + mTotalMisses;
     std::size_t events_since_last_report = mHitsSinceLastReport + mMissesSinceLastReport;
 
+    std::size_t n_fully_computed = std::transform_reduce(mCache.begin(), mCache.end(), 0, std::plus<>(), [](auto &entry) -> std::size_t { if (entry.second->is_fully_computed()) return 1; else return 0; });
+
     std::stringstream ss;
-    ss << "E:" << mCache.size() << std::endl
+    ss << "E:" << mCache.size() << "(F:" << n_fully_computed << ")" << std::endl
        << "T:H:" << mTotalHits           << "|M:" << mTotalMisses           << "|I:" << mTotalInserts           << " / " << total_events << std::endl
        << "S:H:" << mHitsSinceLastReport << "|M:" << mMissesSinceLastReport << "|I:" << mInsertsSinceLastReport << " / " << events_since_last_report;
 

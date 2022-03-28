@@ -127,15 +127,10 @@ public:
     static ptr unserialize(std::istream &is, const std::shared_ptr<StateCache> &cache);
 
     uint32_t max_entropy() const;
-    inline std::size_t n_solutions() const {
-        return mNSolutions;
-    }
-    const Words &words() const {
-        return mWords;
-    }
-    inline std::size_t n_words() const {
-        return mWords.size();
-    }
+    inline std::size_t n_solutions() const { return mNSolutions; }
+    const Words &words() const { return mWords; }
+    inline std::size_t n_words() const { return mWords.size(); }
+    inline bool is_fully_computed() const { return mFullyComputed; }
 
     uint32_t entropy_of(const std::string &word) const;
     uint32_t entropy2_of(const std::string &word) const;
