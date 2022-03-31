@@ -53,6 +53,8 @@ private:
     bool mIsSolution;
 };
 
+std::ostream& operator<<(std::ostream& out, const Word& word);
+
 typedef std::vector<Word> Words;
 
 class WordEntropy {
@@ -95,9 +97,14 @@ private:
     uint32_t mEntropy;
 };
 
+std::ostream& operator<<(std::ostream& out, const WordEntropy& word_entropy);
+
 class ScoredEntropy {
 public:
     ScoredEntropy(const WordEntropy &entropy, const Keyboard &keyboard);
+    inline ScoredEntropy(const WordEntropy &entropy, int score = 0)
+        : mEntropy(entropy)
+	, mScore(score) { }
 
     inline WordEntropy entropy() const {
         return mEntropy;
@@ -111,10 +118,13 @@ public:
         return other.mScore < mScore; // inverted, to achieve decreasing order
     }
 
+
 private:
     WordEntropy mEntropy;
     int mScore;
 };
+
+std::ostream& operator<<(std::ostream& out, const ScoredEntropy& scored_entropy);
 
 class StateCache;
 
@@ -126,17 +136,32 @@ public:
     ptr consider_guess(const std::string &guess, uint32_t match, bool do_full_compute = true) const;
     static ptr unserialize(std::istream &is, const std::shared_ptr<StateCache> &cache);
 
-    uint32_t max_entropy() const;
-    inline std::size_t n_solutions() const { return mNSolutions; }
-    const Words &words() const { return mWords; }
     inline std::size_t n_words() const { return mWords.size(); }
+    const Words &words() const { return mWords; }
+    inline std::size_t n_solutions() const { return mNSolutions; }
+    const Words &solutions() const { return mSolutions; }
+
+    uint32_t max_entropy() const;
     inline bool is_fully_computed() const { return mFullyComputed; }
 
     uint32_t entropy_of(const std::string &word) const;
     uint32_t entropy2_of(const std::string &word) const;
     bool words_equal_to(const Words &other_words) const;
 
-    void best_guess(int generation, const Keyboard &keyboard) const;
+    inline std::vector<WordEntropy> solution_entropies() const {
+	std::vector<WordEntropy> the_entropies;
+        for (auto word : mSolutions) {
+            auto it = std::find_if(mEntropy2.begin(), mEntropy2.end(), [word](const WordEntropy &e) { return e.word().word() == word.word(); });
+	    if (it == mEntropy2.end()) {
+		the_entropies.push_back(WordEntropy(word, 0));
+	    }
+	    else {
+		the_entropies.push_back(*it);
+	    }
+	}
+	return the_entropies;
+    }
+    std::vector<ScoredEntropy> best_guess(const Keyboard &keyboard) const;
 
     void serialize(std::ostream &os) const;
 
@@ -154,10 +179,12 @@ private:
 
     const Words &mAllWords;
     const Words mWords;
-    size_t mNSolutions;
+    const size_t mNSolutions;
+    const Words mSolutions;	// populated only if size will be less than MAX_N_SOLUTIONS_PRINTED
 
-    uint32_t mMaxEntropy;
+    mutable uint32_t mMaxEntropy;
     mutable std::vector<WordEntropy> mEntropy;
     mutable std::vector<WordEntropy> mEntropy2;
+    mutable std::vector<WordEntropy>::const_iterator mHighestEntropy2End;
     mutable bool mFullyComputed;
 };

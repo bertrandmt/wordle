@@ -1,31 +1,57 @@
 // Copyright (c) 2022, Bertrand Mollinier Toublet
 // See LICENSE for details of BSD 3-Clause License
+#include <algorithm>
 #include <cmath>
 #include <condition_variable>
 #include <iostream>
 #include <iterator>
 #include <mutex>
-#include <random>
+#include <numeric>
 
 #include "config.h"
 #include "match.h"
 #include "state.h"
 #include "statecache.h"
 
-namespace {
-
-template<typename Iter, typename RandomGenerator>
-Iter select_randomly(Iter start, Iter end, RandomGenerator& g) {
-    std::uniform_int_distribution<> dis(0, std::distance(start, end) - 1);
-    std::advance(start, dis(g));
-    return start;
+std::ostream& operator<<(std::ostream& out, const Word& word) {
+    return out << "\"" << word.word() << "\"[" << (word.is_solution() ? 'T' : 'F') << "]";
 }
 
-template<typename Iter>
-Iter select_randomly(Iter start, Iter end) {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    return select_randomly(start, end, gen);
+std::ostream& operator<<(std::ostream& out, const WordEntropy& word_entropy) {
+    return out << word_entropy.word() << "[H=" << word_entropy.entropy() / 1000. << "]";
+}
+
+std::ostream& operator<<(std::ostream& out, const ScoredEntropy& scored_entropy) {
+    return out << scored_entropy.entropy() << "[S=" << scored_entropy.score() << "]";
+}
+
+ScoredEntropy::ScoredEntropy(const WordEntropy &entropy, const Keyboard &keyboard)
+    : mEntropy(entropy)
+    , mScore(0) {
+
+    bool seen['z'-'a'] = { false };
+    for (char c : mEntropy.word().word()) {
+        const Letter &l = keyboard.letter(c);
+        if (!seen[c - 'a']) {
+            mScore += static_cast<int>(l.state());
+            seen[c - 'a'] = true;
+        }
+    }
+}
+
+namespace {
+
+Words extract_solutions(const std::size_t n_solutions, const Words &words) {
+    Words the_solutions;
+
+    if (n_solutions > MAX_N_SOLUTIONS_PRINTED) {
+        return the_solutions;
+    }
+
+    std::remove_copy_if(words.begin(), words.end(), std::back_inserter(the_solutions), [](const Word &word) { return !word.is_solution(); });
+    assert(the_solutions.size() == n_solutions);
+
+    return the_solutions;
 }
 
 } // namespace anonymous
@@ -35,10 +61,9 @@ State::State(ThreadPool &pool, const StateCache::ptr &state_cache, const Words &
     , mStateCache(state_cache)
     , mAllWords(all_words)
     , mWords(all_words)
-    , mFullyComputed(false) {
-
-    mNSolutions = std::transform_reduce(mWords.begin(), mWords.end(), 0, std::plus(), [](const Word &word) -> size_t { return word.is_solution() ? 1 : 0; });
-}
+    , mNSolutions(std::transform_reduce(mWords.begin(), mWords.end(), 0, std::plus(), [](const Word &word) -> size_t { return word.is_solution() ? 1 : 0; }))
+    , mSolutions(extract_solutions(mNSolutions, mWords))
+    , mFullyComputed(false) { }
 
 void State::compute_real_entropy() const {
     std::mutex lock;
@@ -78,6 +103,8 @@ void State::compute_real_entropy() const {
     /* 2. sort entropy decreasing */
     std::sort(mEntropy.begin(), mEntropy.end());
 
+    mMaxEntropy = mEntropy.at(0).entropy();
+
     /* 3. compute entropy2 */
     mEntropy2.resize(ENTROPY_2_TOP_N);
     block_sz = mEntropy2.size() / num_blocks + 1;
@@ -110,6 +137,15 @@ void State::compute_real_entropy() const {
 
     /* 4. sort entropy2 decreasing */
     std::sort(mEntropy2.begin(), mEntropy2.end());
+
+    /* 5. find the end of the highest entropy set */
+    mHighestEntropy2End = mEntropy2.begin();
+    while (mEntropy2.front().entropy() == mHighestEntropy2End->entropy() && mHighestEntropy2End != mEntropy2.end()) {
+        mHighestEntropy2End++;
+    }
+
+    /* 6. this state is now fully computed! */
+    mFullyComputed = true;
 }
 
 State::State(const State &other, const Words &filtered_words, bool do_full_compute)
@@ -117,31 +153,25 @@ State::State(const State &other, const Words &filtered_words, bool do_full_compu
     , mStateCache(other.mStateCache)
     , mAllWords(other.mAllWords)
     , mWords(filtered_words)
+    , mNSolutions(std::transform_reduce(mWords.begin(), mWords.end(), 0, std::plus(), [](const Word &word) -> size_t { return word.is_solution() ? 1 : 0; }))
+    , mSolutions(extract_solutions(mNSolutions, mWords))
     , mMaxEntropy(0)
     , mFullyComputed(do_full_compute) {
 
-    /* 1. compute number of solutions among words */
-    mNSolutions = std::transform_reduce(mWords.begin(), mWords.end(), 0, std::plus(), [](const Word &word) -> size_t { return word.is_solution() ? 1 : 0; });
-
-    /* 2. compute entropies */
     if (do_full_compute) {
         compute_real_entropy();
     }
     else {
         // when in submode (not printing), run entropy only on _words_, not _all words_
         std::transform(mWords.begin(), mWords.end(), std::back_inserter(mEntropy), [this](const Word &word) { return WordEntropy(word, compute_entropy_of(word.word())); });
-    }
 
-    /* 3. compute max entropy */
-    mMaxEntropy = std::transform_reduce(mEntropy.begin(), mEntropy.end(), 0, [](uint32_t max_h, uint32_t h) { return std::max(h, max_h); },
+        mMaxEntropy = std::transform_reduce(mEntropy.begin(), mEntropy.end(), 0, [](uint32_t max_h, uint32_t h) { return std::max(h, max_h); },
                                                                              [](const WordEntropy &e) -> uint32_t { return e.entropy(); });
+    }
 }
 
 State::ptr State::consider_guess(const std::string &guess, uint32_t match, bool do_full_compute) const {
     Match m(guess, match);
-    if (do_full_compute) {
-        std::cout << "Considering guess \"" << guess << "\" with match " << m.toString() << std::endl;
-    }
 
     Words filtered_words;
     std::copy_if(mWords.begin(), mWords.end(),
@@ -238,65 +268,29 @@ bool State::words_equal_to(const Words &other_words) const {
     return std::equal_to<Words>{}(mWords, other_words);
 }
 
-ScoredEntropy::ScoredEntropy(const WordEntropy &entropy, const Keyboard &keyboard)
-    : mEntropy(entropy)
-    , mScore(0) {
+std::vector<ScoredEntropy> State::best_guess(const Keyboard &keyboard) const {
+    std::vector<ScoredEntropy> best_guesses;
 
-    bool seen['z'-'a'] = { false };
-    for (char c : mEntropy.word().word()) {
-        const Letter &l = keyboard.letter(c);
-        if (!seen[c - 'a']) {
-            mScore += static_cast<int>(l.state());
-            seen[c - 'a'] = true;
-        }
-    }
-}
-
-void State::best_guess(int generation, const Keyboard &keyboard) const {
     /* stop! */
-    if (generation == 1) {
-        std::cout << "Initial best guess is \"trace\"." << std::endl;
-        return;
-    }
     if (mNSolutions == 0) {
-        std::cout << "No solution left 😭" << std::endl;
-        return;
+	assert(best_guesses.size() == 0);
+        return best_guesses;
     }
     if (mNSolutions == 1) {
-        auto it = std::find_if(mWords.begin(), mWords.end(), [](const Word &w){ return w.is_solution(); });
-        assert(it != mWords.end());
-        std::cout << "THE solution: \"" << it->word() << "\"" << std::endl;
-        return;
+	WordEntropy we(mSolutions.at(0), 0);
+	ScoredEntropy se(we, 0);
+	best_guesses.push_back(se);
+
+	assert(best_guesses.size() == 1);
+        return best_guesses;
     }
 
     if (!mFullyComputed) {
         compute_real_entropy();
-        mFullyComputed = true;
-    }
-
-    if (mNSolutions <= MAX_N_SOLUTIONS_PRINTED) {
-        std::cout << "Solutions and associated entropy:";
-	bool first = true;
-        for (auto word : mWords) {
-            if (!word.is_solution()) continue;
-
-            auto it = std::find_if(mEntropy2.begin(), mEntropy2.end(), [word](const WordEntropy &e) { return e.word().word() == word.word(); });
-	    auto h = mEntropy2.end() == it ? 0 : it->entropy();
-
-	    if (first) first = false;
-	    else       std::cout << ", ";
-            std::cout << "\"" << word.word() << "\":" << h / 1000.;
-        }
-	std::cout << std::endl;
-    }
-
-    auto recommended_guesses_end = mEntropy2.begin();
-    while (mEntropy2.front().entropy() == recommended_guesses_end->entropy()) {
-        recommended_guesses_end++;
     }
 
     std::vector<ScoredEntropy> scored_entropy;
-    for (auto jt = mEntropy2.begin(); jt != recommended_guesses_end; jt++) {
+    for (auto jt = mEntropy2.begin(); jt != mHighestEntropy2End; jt++) {
         scored_entropy.push_back(ScoredEntropy(*jt, keyboard));
     }
     std::sort(scored_entropy.begin(), scored_entropy.end());
@@ -305,17 +299,9 @@ void State::best_guess(int generation, const Keyboard &keyboard) const {
     while (scored_entropy.front().score() == scored_recommended_guesses_end->score()) {
         scored_recommended_guesses_end++;
     }
-    auto scored_recommended_guesses_size = std::distance(scored_entropy.begin(), scored_recommended_guesses_end);
 
-    std::cout << "[H=" << scored_entropy.front().entropy().entropy() / 1000. << "|S=" << scored_entropy.front().score()
-              << "] \"" << select_randomly(scored_entropy.begin(), scored_recommended_guesses_end)->entropy().word().word() << "\" (" << scored_recommended_guesses_size << " words: ";
-    bool first = true;
-    for (auto it = scored_entropy.begin(); it != scored_recommended_guesses_end && distance(scored_entropy.begin(), it) < MAX_N_GUESSES_PRINTED; it++) {
-        if (!first) std::cout << ", ";
-        first = false;
-        std::cout << "\"" << it->entropy().word().word() << "\"";
-    }
-    std::cout << ") " << std::endl;
+    best_guesses = std::vector<ScoredEntropy>(scored_entropy.begin(), scored_recommended_guesses_end);
+    return best_guesses;
 }
 
 void State::serialize(std::ostream & os) const {
@@ -335,14 +321,21 @@ State::State(const State::ptr &other, const Words &words, const std::vector<Word
     , mStateCache(other->mStateCache)
     , mAllWords(other->mAllWords)
     , mWords(words)
+    , mNSolutions(std::transform_reduce(mWords.begin(), mWords.end(), 0, std::plus(), [](const Word &word) -> size_t { return word.is_solution() ? 1 : 0; }))
+    , mSolutions(extract_solutions(mNSolutions, mWords))
     , mEntropy(entropy)
     , mEntropy2(entropy2)
     , mFullyComputed(fully_computed) {
 
-    mNSolutions = std::transform_reduce(mWords.begin(), mWords.end(), 0, std::plus(), [](const Word &word) -> size_t { return word.is_solution() ? 1 : 0; });
-
     mMaxEntropy = std::transform_reduce(mEntropy.begin(), mEntropy.end(), 0, [](uint32_t max_h, uint32_t h) { return std::max(h, max_h); },
                                                                              [](const WordEntropy &e) -> uint32_t { return e.entropy(); });
+
+    if (mFullyComputed) {
+        mHighestEntropy2End = mEntropy2.begin();
+        while (mEntropy2.front().entropy() == mHighestEntropy2End->entropy()) {
+            mHighestEntropy2End++;
+        }
+    }
 }
 
 State::ptr State::unserialize(std::istream &is, const StateCache::ptr &cache) {

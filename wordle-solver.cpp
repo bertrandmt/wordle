@@ -3,6 +3,7 @@
 #include <functional>
 #include <fstream>
 #include <iostream>
+#include <random>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -14,6 +15,24 @@
 #include "threadpool.h"
 #include "wordlist.h"
 
+namespace {
+
+template<typename Iter, typename RandomGenerator>
+Iter select_randomly(Iter start, Iter end, RandomGenerator& g) {
+    std::uniform_int_distribution<> dis(0, std::distance(start, end) - 1);
+    std::advance(start, dis(g));
+    return start;
+}
+
+template<typename Iter>
+Iter select_randomly(Iter start, Iter end) {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    return select_randomly(start, end, gen);
+}
+
+} // namespace anonymous
+
 struct GameState {
     GameState(int g, const State::ptr &s, const Keyboard &k)
         : generation(g)
@@ -22,12 +41,58 @@ struct GameState {
 
     inline void serialize(std::ostream &os) const {
         os << "State[gen:" << generation << "]: S:" << state->n_solutions() << "|W:" << state->n_words() << std::endl;
+        if (generation == 1) {
+            os << "Initial best guess is \"trace\"." << std::endl;
+        }
+    }
+
+    void display_best_guesses() {
+        if (state->n_solutions() == 1) {
+            std::cout << ">>>>> THE SOLUTION: \"" << state->solutions().at(0).word() << "\" <<<<<" << std::endl;
+            return;
+        }
+
+        auto best_guesses = state->best_guess(keyboard);
+        if (best_guesses.size() == 0) {
+            std::cout << "No solution left 😭" << std::endl;
+            return;
+        }
+
+        if (state->n_solutions() <= MAX_N_SOLUTIONS_PRINTED) {
+            std::cout << "Solutions and associated entropy: ";
+            bool first = true;
+            for (auto entropy : state->solution_entropies()) {
+                if (first) first = false;
+                else       std::cout << ", ";
+                std::cout << entropy;
+            }
+            std::cout << std::endl;
+        }
+
+        std::cout << "[H=" << best_guesses.front().entropy().entropy() / 1000. << "|S=" << best_guesses.front().score()
+                  << "] \"" << select_randomly(best_guesses.begin(), best_guesses.end())->entropy().word().word() << "\"";
+        if (best_guesses.size() > 1) {
+            std::cout << " (" << best_guesses.size() << " words: ";
+            bool first = true;
+            for (auto it = best_guesses.begin(); it != best_guesses.end() && distance(best_guesses.begin(), it) < MAX_N_GUESSES_PRINTED; it++) {
+                if (!first) std::cout << ", ";
+                first = false;
+                std::cout << "\"" << it->entropy().word().word() << "\"";
+            }
+            if (best_guesses.size() > MAX_N_GUESSES_PRINTED) {
+                std::cout << ", ...";
+            }
+            std::cout << ") ";
+        }
+        std::cout << std::endl;
     }
 
     const int generation;
     const State::ptr state;
     const Keyboard keyboard;
 };
+
+namespace {
 
 void help(void) {
     std::cout << "Enter your successive guesses, along with the outcome in the format:" << std::endl
@@ -37,6 +102,8 @@ void help(void) {
               << "      separated by a colon (';')" << std::endl
               << "    * a five character representation of the outcome where '_' indicates no match, 'p'" << std::endl
               << "      indicates present and 'c' indicates correct." << std::endl;
+}
+
 }
 
 int main(void) {
@@ -91,7 +158,6 @@ int main(void) {
         current_game_states[i].push_back(initial_gamestate);
     }
     initial_gamestate.serialize(std::cout);
-    initial_gamestate.state->best_guess(initial_gamestate.generation, initial_gamestate.keyboard);
 
     for (std::string line; std::cout << "] " << std::flush && std::getline(std::cin, line);) {
 
@@ -115,7 +181,6 @@ int main(void) {
                     current_game_states[i].push_back(initial_gamestate);
                 }
                 initial_gamestate.serialize(std::cout);
-                initial_gamestate.state->best_guess(initial_gamestate.generation, initial_gamestate.keyboard);
                 continue;
 
             case '^': // back one
@@ -128,7 +193,9 @@ int main(void) {
                 for (auto i = 0; i < current_game; i++) {
                     current_game_states[i].pop_back();
                     current_game_states[i].back().serialize(std::cout);
-                    current_game_states[i].back().state->best_guess(current_game_states[i].back().generation, current_game_states[i].back().keyboard);
+                    if (current_game_states[i].size() != 1) { // not back at initial game state
+                       current_game_states[i].back().display_best_guesses();
+                    }
                 }
                 continue;
 
@@ -153,7 +220,6 @@ int main(void) {
                     current_game_states[i].push_back(initial_gamestate);
                 }
                 initial_gamestate.serialize(std::cout);
-                initial_gamestate.state->best_guess(initial_gamestate.generation, initial_gamestate.keyboard);
                 continue;
 
             case '?': { // what is the entropy of the word?
@@ -188,7 +254,7 @@ int main(void) {
             if (current_game_states[i].back().state->n_solutions() == 1) {
                 auto s = current_game_states[i].back();
                 current_game_states[i].push_back(s);
-                s.state->best_guess(s.generation, s.keyboard);
+                s.display_best_guesses();
             }
             else {
                 if (guess.size() != matches[i].size()) {
@@ -204,12 +270,13 @@ int main(void) {
                 }
 
                 auto p = current_game_states[i].back();
+                std::cout << "Considering guess \"" << guess << "\" with match " << m.toString() << std::endl;
                 auto s = p.state->consider_guess(guess, m.value());
                 auto k = p.keyboard.updateWithGuess(guess, m);
                 GameState gs(p.generation + 1, s, k);
                 gs.serialize(std::cout);
                 current_game_states[i].push_back(gs);
-                s->best_guess(gs.generation, k);
+                gs.display_best_guesses();
             }
         }
 
