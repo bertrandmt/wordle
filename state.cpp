@@ -275,15 +275,19 @@ void State::best_guess(int generation, const Keyboard &keyboard) const {
     }
 
     if (mNSolutions <= MAX_N_SOLUTIONS_PRINTED) {
-        std::cout << "Solutions and associated entropy:" << std::endl;
+        std::cout << "Solutions and associated entropy:";
+	bool first = true;
         for (auto word : mWords) {
-            if (word.is_solution()) {
-                auto it = std::find_if(mEntropy2.begin(), mEntropy2.end(), [word](const WordEntropy &e) { return e.word().word() == word.word(); });
-                auto h = (it == mEntropy2.end()) ? 0.0 : it->entropy() / 1000.;
+            if (!word.is_solution()) continue;
 
-                std::cout << "\t\"" << word.word() << "\": " << h << std::endl;
-            }
+            auto it = std::find_if(mEntropy2.begin(), mEntropy2.end(), [word](const WordEntropy &e) { return e.word().word() == word.word(); });
+	    auto h = mEntropy2.end() == it ? 0 : it->entropy();
+
+	    if (first) first = false;
+	    else       std::cout << ", ";
+            std::cout << "\"" << word.word() << "\":" << h / 1000.;
         }
+	std::cout << std::endl;
     }
 
     auto recommended_guesses_end = mEntropy2.begin();
