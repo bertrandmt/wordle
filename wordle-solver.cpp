@@ -110,7 +110,204 @@ void help(void) {
               << "      indicates present and 'c' indicates correct." << std::endl;
 }
 
+} // namespace anonymous
+
+class GameStates {
+public:
+    enum nStates : int {
+        kWordleNStates = 1,
+        kQuordleNStates = 4,
+        kOctordleNStates = 8,
+    };
+
+    GameStates(GameState &initial_game_state)
+        : mInitialGameState(initial_game_state)
+        , mCurrentGame(kWordleNStates)
+        , mCurrentGameStates(mWordleStates) {
+       reset();
+    }
+
+    void reset() {
+        for (auto i = 0; i < mCurrentGame; i++) {
+            mCurrentGameStates[i].clear();
+            mCurrentGameStates[i].push_back(mInitialGameState);
+        }
+        mInitialGameState.serialize(std::cout);
+    }
+
+    void back_one() {
+       if (mCurrentGameStates[0].size() == 1) {
+           std::cout << "Already at initial state" << std::endl;
+           return;
+       }
+
+       for (auto i = 0; i < mCurrentGame; i++) {
+           mCurrentGameStates[i].pop_back();
+           mCurrentGameStates[i].back().serialize(std::cout);
+           if (mCurrentGameStates[i].size() != 1) { // not back at initial game state
+              mCurrentGameStates[i].back().display_best_guesses();
+           }
+       }
+    }
+
+    void switch_game() {
+       switch (mCurrentGame) {
+           case kWordleNStates:
+               mCurrentGame = kQuordleNStates;
+               mCurrentGameStates = mQuordleStates;
+               break;
+           case kQuordleNStates:
+               mCurrentGame = kOctordleNStates;
+               mCurrentGameStates = mOctordleStates;
+               break;
+           case kOctordleNStates:
+               mCurrentGame = kWordleNStates;
+               mCurrentGameStates = mWordleStates;
+               break;
+       }
+       reset();
+    }
+
+    nStates current_game() const { return mCurrentGame; }
+    nStates next_game() const {
+        switch (mCurrentGame) {
+            case kWordleNStates: return kQuordleNStates;
+            case kQuordleNStates: return kOctordleNStates;
+            case kOctordleNStates: return kWordleNStates;
+        }
+    }
+
+    GameState &at(std::size_t i) const {
+        return mCurrentGameStates[i % mCurrentGame].back();
+    }
+
+    void process_guess(const std::string &guess, const std::vector<std::string> &matches) {
+        if (matches.size() != mCurrentGame) {
+            help();
+            return;
+        }
+
+        for (auto i = 0; i < mCurrentGame; i++) {
+            auto &gs = mCurrentGameStates[i].back();
+            if (gs.state->n_solutions() == 1) {
+                mCurrentGameStates[i].push_back(gs);
+                gs.display_best_guesses();
+            }
+            else {
+                if (guess.size() != matches[i].size()) {
+                    help();
+                    continue;
+                }
+
+                bool ok = true;
+                Match m = Match::fromString(guess, matches[i], ok);
+                if (!ok) {
+                    help();
+                    continue;
+                }
+
+                std::cout << "Considering guess \"" << guess << "\" with match " << m.toString() << std::endl;
+                auto s = gs.state->consider_guess(guess, m.value());
+                auto k = gs.keyboard.update_with_guess(guess, m);
+                GameState gt(gs.generation + 1, s, k);
+                gt.serialize(std::cout);
+                mCurrentGameStates[i].push_back(gt);
+                gt.display_best_guesses();
+            }
+        }
+    }
+
+private:
+    GameState const& mInitialGameState;
+
+    nStates mCurrentGame;
+    std::vector<GameState> *mCurrentGameStates;
+
+    std::vector<GameState> mWordleStates[kWordleNStates];
+    std::vector<GameState> mQuordleStates[kQuordleNStates];
+    std::vector<GameState> mOctordleStates[kOctordleNStates];
+};
+
+namespace {
+
+bool subroutine(ThreadPool &pool, std::mutex &mutex, std::condition_variable &cond, GameStates &game_states, const StateCache::ptr &state_cache) {
+    bool done = false;
+    std::string line;
+    std::cout << "] " << std::flush;
+    std::getline(std::cin, line);
+    if (!std::cin) {
+        done = true;
+        return done;
+    }
+
+    // no whitespace we care to make use of
+    std::string nowsline(line, 0);
+    nowsline.erase(std::remove_if(nowsline.begin(), nowsline.end(), [](auto c){ return std::isspace(c); }), nowsline.end());
+    if (nowsline.size() == 0) { return done; }
+
+    switch(nowsline[0]) {
+        case '#': // it's a comment
+            std::cout << line << std::endl;
+            return done;
+
+        case '!': // reset!
+            std::cout << "# RESET!" << std::endl;
+            game_states.reset();
+            return done;
+
+        case '^': // back one
+            std::cout << "^ BACK ONE" << std::endl;
+            game_states.back_one();
+            return done;
+
+        case '%': // change number of concurrent games
+            std::cout << "% SWITCHING TO " << game_states.next_game() << " CONCURRENT GAMES" << std::endl;
+            game_states.switch_game();
+            return done;
+
+        case '?': { // what is the entropy of the word?
+            std::string word = nowsline.substr(1);
+            for (auto i = 0; i < game_states.current_game(); i++) {
+                std::cout << "[" << i << "] H(\"" << word << "\") = " << game_states.at(i).state->entropy_of(word) << std::endl;
+                std::cout << "[" << i << "]H2(\"" << word << "\") = " << game_states.at(i).state->entropy2_of(word) << std::endl;
+            }
+            }
+            return done;
+
+        default:
+            break;
+    }
+
+    auto ofs = nowsline.find(';');
+    std::string guess = nowsline.substr(0, ofs);
+
+    std::vector<std::string> matches;
+    while (ofs != std::string::npos) {
+        auto ofs2 = nowsline.find(';', ofs + 1);
+        std::string match = nowsline.substr(ofs + 1, ofs2 - ofs - 1) ;
+        matches.push_back(match);
+        ofs = ofs2;
+    }
+    game_states.process_guess(guess, matches);
+
+    std::cout << state_cache->report() << std::endl;
+
+    return done;
 }
+
+void routine(ThreadPool &pool, std::mutex &mutex, std::condition_variable &cond, bool &done, GameStates &game_states, const StateCache::ptr &state_cache) {
+    bool subdone = subroutine(pool, mutex, cond, game_states, state_cache);
+    if (subdone) {
+        std::lock_guard<std::mutex> lock(mutex);
+        done = true;
+    }
+    else {
+        pool.push([&pool, &mutex, &cond, &done, &game_states, &state_cache]() { routine(pool, mutex, cond, done, game_states, state_cache); });
+    }
+    cond.notify_all();
+}
+
+} // namespace anonymous
 
 int main(void) {
     ThreadPool pool;
@@ -127,147 +324,17 @@ int main(void) {
     Keyboard initial_keyboard;
 
     GameState initial_gamestate(1, state_cache->initial_state(), initial_keyboard);
+    GameStates game_states(initial_gamestate);
 
-    enum nStates : int {
-        kWordleNStates = 1,
-        kQuordleNStates = 4,
-        kOctordleNStates = 8,
-    };
+    std::mutex mutex;
+    std::condition_variable cond;
+    bool done = false;
 
+    pool.push([&pool, &mutex, &cond, &done, &game_states, &state_cache]() { routine(pool, mutex, cond, done, game_states, state_cache); });
 
-    std::vector<GameState> wordle_states[kWordleNStates];
-    std::vector<GameState> quordle_states[kQuordleNStates];
-    std::vector<GameState> octordle_states[kOctordleNStates];
-
-    nStates current_game = kWordleNStates;
-    std::vector<GameState> *current_game_states = wordle_states;
-    for (auto i = 0; i < current_game; i++) {
-        current_game_states[i].push_back(initial_gamestate);
-    }
-    initial_gamestate.serialize(std::cout);
-
-    for (std::string line; std::cout << "] " << std::flush && std::getline(std::cin, line);) {
-
-        // no whitespace we care to make use of
-        std::string nowsline(line, 0);
-        nowsline.erase(std::remove_if(nowsline.begin(), nowsline.end(), [](unsigned char c){return std::isspace(c);}), nowsline.end());
-
-        if (nowsline.size() == 0) { // it was all white space
-            continue;
-        }
-
-        switch(nowsline[0]) {
-            case '#': // it's a comment
-                std::cout << line << std::endl;
-                continue;
-
-            case '!': // reset!
-                std::cout << "# RESET!" << std::endl;
-                for (auto i = 0; i < current_game; i++) {
-                    current_game_states[i].clear();
-                    current_game_states[i].push_back(initial_gamestate);
-                }
-                initial_gamestate.serialize(std::cout);
-                continue;
-
-            case '^': // back one
-                std::cout << "^ BACK ONE" << std::endl;
-                if (current_game_states[0].size() == 1) {
-                    std::cout << "Already at initial state" << std::endl;
-                    continue;
-                }
-
-                for (auto i = 0; i < current_game; i++) {
-                    current_game_states[i].pop_back();
-                    current_game_states[i].back().serialize(std::cout);
-                    if (current_game_states[i].size() != 1) { // not back at initial game state
-                       current_game_states[i].back().display_best_guesses();
-                    }
-                }
-                continue;
-
-            case '%': // change number of concurrent games
-                switch (current_game) {
-                    case kWordleNStates:
-                        current_game = kQuordleNStates;
-                        current_game_states = quordle_states;
-                        break;
-                    case kQuordleNStates:
-                        current_game = kOctordleNStates;
-                        current_game_states = octordle_states;
-                        break;
-                    case kOctordleNStates:
-                        current_game = kWordleNStates;
-                        current_game_states = wordle_states;
-                        break;
-                }
-                std::cout << "% SWITCHING TO " << current_game << " CONCURRENT GAMES" << std::endl;
-                for (auto i = 0; i < current_game; i++) {
-                    current_game_states[i].clear();
-                    current_game_states[i].push_back(initial_gamestate);
-                }
-                initial_gamestate.serialize(std::cout);
-                continue;
-
-            case '?': { // what is the entropy of the word?
-                std::string word = nowsline.substr(1);
-                for (auto i = 0; i < current_game; i++) {
-                    std::cout << "[" << i << "] H(\"" << word << "\") = " << current_game_states[i].back().state->entropy_of(word) << std::endl;
-                    std::cout << "[" << i << "]H2(\"" << word << "\") = " << current_game_states[i].back().state->entropy2_of(word) << std::endl;
-                }
-                }
-                continue;
-
-            default:
-                break;
-        }
-
-        auto ofs = nowsline.find(';');
-        std::string guess = nowsline.substr(0, ofs);
-
-        std::vector<std::string> matches;
-        while (ofs != std::string::npos) {
-            auto ofs2 = nowsline.find(';', ofs+1);
-            std::string match = nowsline.substr(ofs + 1, ofs2 - ofs - 1) ;
-            matches.push_back(match);
-            ofs = ofs2;
-        }
-        if (matches.size() != current_game) {
-            help();
-            continue;
-        }
-
-        for (auto i = 0; i < current_game; i++) {
-            if (current_game_states[i].back().state->n_solutions() == 1) {
-                auto s = current_game_states[i].back();
-                current_game_states[i].push_back(s);
-                s.display_best_guesses();
-            }
-            else {
-                if (guess.size() != matches[i].size()) {
-                    help();
-                    continue;
-                }
-
-                bool ok = true;
-                Match m = Match::fromString(guess, matches[i], ok);
-                if (!ok) {
-                    help();
-                    continue;
-                }
-
-                auto p = current_game_states[i].back();
-                std::cout << "Considering guess \"" << guess << "\" with match " << m.toString() << std::endl;
-                auto s = p.state->consider_guess(guess, m.value());
-                auto k = p.keyboard.update_with_guess(guess, m);
-                GameState gs(p.generation + 1, s, k);
-                gs.serialize(std::cout);
-                current_game_states[i].push_back(gs);
-                gs.display_best_guesses();
-            }
-        }
-
-        std::cout << state_cache->report() << std::endl;
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        cond.wait(lock, [&done]() { return done; });
     }
 
     state_cache->persist();
