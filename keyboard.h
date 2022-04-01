@@ -2,9 +2,9 @@
 // See LICENSE for details of BSD 3-Clause License
 #pragma once
 
-#include "match.h"
-
 #include <vector>
+
+class Match;
 
 class Letter {
 public:

@@ -2,6 +2,7 @@
 // See LICENSE for details of BSD 3-Clause License
 #include "config.h"
 #include "keyboard.h"
+#include "match.h"
 
 #include <iostream>
 

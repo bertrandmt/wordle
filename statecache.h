@@ -7,7 +7,7 @@
 #include <sstream>
 #include <unordered_map>
 
-#include "state.h"
+class State;
 
 template <>
 struct std::hash<Words> {
@@ -33,7 +33,7 @@ struct std::equal_to<Words> {
 class StateCache {
 public:
     typedef std::shared_ptr<StateCache> ptr;
-    typedef std::unordered_map<Words, State::ptr> map;
+    typedef std::unordered_map<Words, std::shared_ptr<State>> map;
     typedef map::iterator iterator;
 
     inline StateCache()
@@ -46,10 +46,10 @@ public:
     static ptr unserialize(ptr &cache, std::istream &is);
 
     bool contains(const Words &key) const;
-    State::ptr at(const Words &key);
-    std::pair<iterator, bool> insert(const Words &key, State::ptr value);
+    std::shared_ptr<State> at(const Words &key);
+    std::pair<iterator, bool> insert(const Words &key, std::shared_ptr<State> value);
 
-    State::ptr initial_state() const {
+    std::shared_ptr<State> initial_state() const {
         return mInitialState;
     }
 

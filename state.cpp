@@ -9,9 +9,11 @@
 #include <numeric>
 
 #include "config.h"
+#include "keyboard.h"
 #include "match.h"
 #include "state.h"
 #include "statecache.h"
+#include "threadpool.h"
 
 std::ostream& operator<<(std::ostream& out, const Word& word) {
     return out << "\"" << word.word() << "\"[" << (word.is_solution() ? 'T' : 'F') << "]";

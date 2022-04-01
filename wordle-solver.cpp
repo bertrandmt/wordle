@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "config.h"
+#include "keyboard.h"
 #include "match.h"
 #include "state.h"
 #include "statecache.h"
@@ -109,17 +110,10 @@ void help(void) {
 int main(void) {
     ThreadPool pool;
     StateCache::ptr state_cache(new StateCache);
+    Wordlist word_list;
 
-    Words all_words;
-    for (auto w : solutions) {
-        all_words.push_back(Word(w, true));
-    }
-    for (auto w : allowed) {
-        all_words.push_back(Word(w, false));
-    }
-
-    State::ptr initial_state(new State(pool, state_cache, all_words));
-    auto p = state_cache->insert(all_words, initial_state);
+    State::ptr initial_state(new State(pool, state_cache, word_list.all_words()));
+    auto p = state_cache->insert(word_list.all_words(), initial_state);
     assert(p.second);
 
     std::cout << "Loading state cache..." << std::flush;

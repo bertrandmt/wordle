@@ -6,7 +6,15 @@
 #include <vector>
 #include <string>
 
-extern const std::vector<std::string> solutions;
-extern const std::vector<std::string> allowed;
+#include "word.h"
+
+class Wordlist {
+public:
+    Wordlist();
+    const Words &all_words() const { return mAllWords; }
+
+private:
+    const Words mAllWords;
+};
 
 #endif // WORD_LIST_H

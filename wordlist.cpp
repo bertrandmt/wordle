@@ -1012,4 +1012,23 @@ const std::vector<std::string> allowed = {
 #endif
 };
 
+namespace {
+
+Words assemble_all_words() {
+    Words all_words;
+    for (auto w : solutions) {
+        all_words.push_back(Word(w, true));
+    }
+    for (auto w : allowed) {
+        all_words.push_back(Word(w, false));
+    }
+    return all_words;
+}
+
+} // namespace anonymous
+
+Wordlist::Wordlist()
+    : mAllWords(assemble_all_words()) {
+}
+
 
