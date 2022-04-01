@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 
-const size_t kMaxMatchValue = 242;
 
 class Match {
 public:
@@ -14,6 +13,7 @@ public:
         kPresent = 1,
         kCorrect = 2,
     };
+    static const size_t kMaxValue = 242;
 
     Match(const std::string &guess, const std::string &solution);
     Match(const std::string &guess, uint32_t match);

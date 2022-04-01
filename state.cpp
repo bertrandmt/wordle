@@ -208,7 +208,7 @@ State::ptr State::consider_guess(const std::string &guess, uint32_t match, bool 
 }
 
 uint32_t State::compute_entropy_of(const std::string &word) const {
-    std::vector<uint32_t> match_counts(kMaxMatchValue + 1, 0);
+    std::vector<uint32_t> match_counts(Match::kMaxValue + 1, 0);
 
     for (auto solution : mWords) {
         if (!solution.is_solution()) continue;
@@ -227,7 +227,7 @@ uint32_t State::compute_entropy_of(const std::string &word) const {
 }
 
 uint32_t State::compute_entropy2_of(const std::string &word) const {
-    std::vector<uint32_t> match_counts(kMaxMatchValue + 1, 0);
+    std::vector<uint32_t> match_counts(Match::kMaxValue + 1, 0);
 
     for (auto solution : mWords) {
         if (!solution.is_solution()) continue;
