@@ -22,6 +22,7 @@ public:
 
     inline std::size_t n_words() const { return mWords.size(); }
     const Words &words() const { return mWords; }
+    const Words *words_ptr() const { return &mWords; }
     inline std::size_t n_solutions() const { return mNSolutions; }
     const Words &solutions() const { return mSolutions; }
 
@@ -32,18 +33,19 @@ public:
     uint32_t entropy2_of(const std::string &word) const;
     bool words_equal_to(const Words &other_words) const;
 
+    Words filtered_words_for_guess(const std::string &guess, uint32_t match) const;
     inline std::vector<WordEntropy> solution_entropies() const {
-	std::vector<WordEntropy> the_entropies;
+        std::vector<WordEntropy> the_entropies;
         for (auto word : mSolutions) {
             auto it = std::find_if(mEntropy2.begin(), mEntropy2.end(), [word](const WordEntropy &e) { return e.word().word() == word.word(); });
-	    if (it == mEntropy2.end()) {
-		the_entropies.push_back(WordEntropy(word, 0));
-	    }
-	    else {
-		the_entropies.push_back(*it);
-	    }
-	}
-	return the_entropies;
+            if (it == mEntropy2.end()) {
+                the_entropies.push_back(WordEntropy(word, 0));
+            }
+            else {
+                the_entropies.push_back(*it);
+            }
+        }
+        return the_entropies;
     }
     std::vector<ScoredEntropy> best_guess(const Keyboard &keyboard) const;
 
@@ -64,7 +66,7 @@ private:
     const Words &mAllWords;
     const Words mWords;
     const size_t mNSolutions;
-    const Words mSolutions;	// populated only if size will be less than MAX_N_SOLUTIONS_PRINTED
+    const Words mSolutions;        // populated only if size will be less than MAX_N_SOLUTIONS_PRINTED
 
     mutable uint32_t mMaxEntropy;
     mutable std::vector<WordEntropy> mEntropy;

@@ -46,6 +46,11 @@ public:
         return Word(word, is_solution);
     }
 
+    bool operator ==(const Word &other) const {
+        return mWord == other.mWord
+            && mIsSolution == other.mIsSolution;
+    }
+
 private:
     std::string mWord;
     bool mIsSolution;
@@ -102,7 +107,7 @@ public:
     ScoredEntropy(const WordEntropy &entropy, const Keyboard &keyboard);
     inline ScoredEntropy(const WordEntropy &entropy, int score = 0)
         : mEntropy(entropy)
-	, mScore(score) { }
+        , mScore(score) { }
 
     inline WordEntropy entropy() const {
         return mEntropy;

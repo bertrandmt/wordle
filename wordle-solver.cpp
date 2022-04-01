@@ -113,24 +113,12 @@ int main(void) {
     Wordlist word_list;
 
     State::ptr initial_state(new State(pool, state_cache, word_list.all_words()));
-    auto p = state_cache->insert(word_list.all_words(), initial_state);
+    auto p = state_cache->insert(initial_state);
     assert(p.second);
 
-    std::cout << "Loading state cache..." << std::flush;
-    std::ifstream ifs;
-    ifs.open("wordle_state_cache.txt");
-    if (ifs.fail()) {
-        std::cout << " failed: initializing from scratch" << std::endl;
-    }
-    else {
-        auto c = StateCache::unserialize(state_cache, ifs);
-        assert(c == state_cache);
-        ifs.close();
-        std::cout << " done" << std::endl;
+    auto c = StateCache::restore(state_cache);
+    assert(c == state_cache);
 
-        state_cache->reset_stats();
-        std::cout << state_cache->report() << std::endl;
-    }
     Keyboard initial_keyboard;
 
     GameState initial_gamestate(1, state_cache->initial_state(), initial_keyboard);
@@ -277,13 +265,7 @@ int main(void) {
         std::cout << state_cache->report() << std::endl;
     }
 
-    std::cout << "Persisting state cache..." << std::flush;
-    std::ofstream ofs;
-    ofs.open("wordle_state_cache.txt", std::ofstream::trunc);
-    state_cache->serialize(ofs);
-    ofs.close();
-    std::cout << " done" << std::endl;
-
+    state_cache->persist();
     pool.done();
 
     return 0;

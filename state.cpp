@@ -142,7 +142,7 @@ void State::compute_real_entropy() const {
 
     /* 5. find the end of the highest entropy set */
     mHighestEntropy2End = mEntropy2.begin();
-    while (mEntropy2.front().entropy() == mHighestEntropy2End->entropy() && mHighestEntropy2End != mEntropy2.end()) {
+    while (mHighestEntropy2End != mEntropy2.end() && mEntropy2.front().entropy() == mHighestEntropy2End->entropy()) {
         mHighestEntropy2End++;
     }
 
@@ -172,7 +172,7 @@ State::State(const State &other, const Words &filtered_words, bool do_full_compu
     }
 }
 
-State::ptr State::consider_guess(const std::string &guess, uint32_t match, bool do_full_compute) const {
+Words State::filtered_words_for_guess(const std::string &guess, uint32_t match) const {
     Match m(guess, match);
 
     Words filtered_words;
@@ -188,13 +188,18 @@ State::ptr State::consider_guess(const std::string &guess, uint32_t match, bool 
 #endif
                return n.value() == match;
             });
+    return filtered_words;
+}
 
-    if (mStateCache->contains(filtered_words)) {
+State::ptr State::consider_guess(const std::string &guess, uint32_t match, bool do_full_compute) const {
+    Words filtered_words = filtered_words_for_guess(guess, match);
+
+    if (mStateCache->contains(&filtered_words)) {
 #if DEBUG_STATE_CACHE
         std::cout << "+" << std::flush;
 #endif // DEBUG_STATE_CACHE
 
-        return mStateCache->at(filtered_words);
+        return mStateCache->at(&filtered_words);
     }
     else {
 #if DEBUG_STATE_CACHE
@@ -202,7 +207,7 @@ State::ptr State::consider_guess(const std::string &guess, uint32_t match, bool 
 #endif // DEBUG_STATE_CACHE
 
         State::ptr s(new State(*this, filtered_words, do_full_compute));
-        auto jt = mStateCache->insert(filtered_words, s);
+        auto jt = mStateCache->insert(s);
         return jt.first->second;
     }
 }
@@ -275,15 +280,15 @@ std::vector<ScoredEntropy> State::best_guess(const Keyboard &keyboard) const {
 
     /* stop! */
     if (mNSolutions == 0) {
-	assert(best_guesses.size() == 0);
+        assert(best_guesses.size() == 0);
         return best_guesses;
     }
     if (mNSolutions == 1) {
-	WordEntropy we(mSolutions.at(0), 0);
-	ScoredEntropy se(we, 0);
-	best_guesses.push_back(se);
+        WordEntropy we(mSolutions.at(0), 0);
+        ScoredEntropy se(we, 0);
+        best_guesses.push_back(se);
 
-	assert(best_guesses.size() == 1);
+        assert(best_guesses.size() == 1);
         return best_guesses;
     }
 
@@ -334,7 +339,7 @@ State::State(const State::ptr &other, const Words &words, const std::vector<Word
 
     if (mFullyComputed) {
         mHighestEntropy2End = mEntropy2.begin();
-        while (mEntropy2.front().entropy() == mHighestEntropy2End->entropy()) {
+        while (mHighestEntropy2End != mEntropy2.end() && mEntropy2.front().entropy() == mHighestEntropy2End->entropy()) {
             mHighestEntropy2End++;
         }
     }
@@ -356,7 +361,9 @@ State::ptr State::unserialize(std::istream &is, const StateCache::ptr &cache) {
 
     std::vector<WordEntropy> entropy;
     for (std::size_t i = 0; i < n_entropy; i++) {
-        entropy.push_back(WordEntropy::unserialize(is));
+        WordEntropy e = WordEntropy::unserialize(is);
+        if (e.entropy() == 0) continue;
+        entropy.push_back(e);
     }
 
     std::vector<WordEntropy> entropy2;
@@ -365,7 +372,9 @@ State::ptr State::unserialize(std::istream &is, const StateCache::ptr &cache) {
         is >> n_entropy2;
 
         for (std::size_t i = 0; i < n_entropy2; i++) {
-            entropy2.push_back(WordEntropy::unserialize(is));
+            WordEntropy e = WordEntropy::unserialize(is);
+            if (e.entropy() == 0) continue;
+            entropy2.push_back(e);
         }
     }
 

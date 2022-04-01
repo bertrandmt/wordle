@@ -10,13 +10,13 @@
 #include "state.h"
 #include "statecache.h"
 
-bool StateCache::contains(const Words &key) const {
+bool StateCache::contains(const Words *key) const {
     std::shared_lock sl(mMutex);
 
     return mCache.contains(key);
 }
 
-State::ptr StateCache::at(const Words &key) {
+State::ptr StateCache::at(const Words *key) {
     std::shared_lock sl(mMutex);
 
     auto s = mCache.at(key);
@@ -25,18 +25,19 @@ State::ptr StateCache::at(const Words &key) {
     return s;
 }
 
-std::pair<StateCache::iterator, bool> StateCache::insert(const Words &key, State::ptr value) {
+std::pair<StateCache::iterator, bool> StateCache::insert(State::ptr value) {
     std::unique_lock ul(mMutex);
 
     mTotalMisses++;
     mMissesSinceLastReport++;
 
+    auto key = value->words_ptr();
     auto it = mCache.insert(std::make_pair(key, value));
     if (!it.second) {
-        assert(it.first->second->words_equal_to(key));
+        assert(it.first->second->words_equal_to(*key));
 #if DEBUG_STATE_CACHE
         std::cout << "FAILED to insert state with filtered words: " << std::endl;
-        std::for_each(key.begin(), key.end(), [](const Word &w) { std::cout << "\"" << w.word() << "\", "; });
+        std::for_each(key->begin(), key->end(), [](const Word &w) { std::cout << "\"" << w.word() << "\", "; });
         std::cout << std::endl
                   << "It was probably inserted concurrently; continuing" << std::endl;
 #endif // DEBUG_STATE_CACHE
@@ -80,15 +81,49 @@ void StateCache::serialize(std::ostream &os) const {
         });
 }
 
-StateCache::ptr StateCache::unserialize(StateCache::ptr &cache, std::istream &is) {
+void StateCache::persist() const {
+    std::cout << "Persisting state cache..." << std::flush;
+
+    std::ofstream ofs;
+    ofs.open("wordle_state_cache.txt", std::ofstream::trunc);
+
+    serialize(ofs);
+
+    ofs.close();
+    std::cout << " done" << std::endl;
+}
+
+StateCache::ptr StateCache::unserialize(StateCache::ptr &init, std::istream &is) {
     std::size_t n_states;
     is >> n_states;
 
     for (size_t i = 0; i < n_states; i++) {
-        State::ptr state = State::unserialize(is, cache);
-        auto p = cache->insert(state->words(), state);
+        State::ptr state = State::unserialize(is, init);
+        auto p = init->insert(state);
         assert(p.second);
     }
 
-    return cache;
+    return init;
+}
+
+StateCache::ptr StateCache::restore(StateCache::ptr &init) {
+    std::cout << "Loading state cache..." << std::flush;
+
+    std::ifstream ifs;
+    ifs.open("wordle_state_cache.txt");
+    if (ifs.fail()) {
+        std::cout << " failed: initializing from scratch" << std::endl;
+        return init;
+    }
+
+    auto c = StateCache::unserialize(init, ifs);
+    assert(c == init);
+
+    ifs.close();
+    std::cout << " done" << std::endl;
+
+    init->reset_stats();
+    std::cout << init->report() << std::endl;
+
+    return init;
 }

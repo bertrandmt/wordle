@@ -1,9 +1,11 @@
-CPPFLAGS=-std=c++20 -O3 # -g -Wall
+CPPFLAGS=-std=c++20 -Wall -O3 # -g -Wall
 CC=$(CXX)
 
 src = keyboard.cpp match.cpp state.cpp statecache.cpp threadpool.cpp wordlist.cpp
 
 wordle-solver: $(src:%.cpp=%.o)
+
+state-compute: $(src:%.cpp=%.o)
 
 
 .PHONY: depend

@@ -10,21 +10,21 @@
 class State;
 
 template <>
-struct std::hash<Words> {
-    std::size_t operator()(Words const& words) const noexcept {
+struct std::hash<const Words *> {
+    std::size_t operator()(Words const *words) const noexcept {
         std::stringstream ss;
-        std::for_each(words.begin(), words.end(), [&ss](const Word &s) { ss << s.word(); });
+        std::for_each(words->begin(), words->end(), [&ss](const Word &s) { ss << s.word(); });
         std::string s = ss.str();
         return std::hash<std::string>{}(s);
     }
 };
 
 template <>
-struct std::equal_to<Words> {
-    bool operator()(const Words &lhs, const Words &rhs) const {
-        if (lhs.size() != rhs.size()) return false;
-        for (auto lit = lhs.cbegin(), rit = rhs.cbegin(); lit != lhs.end(); lit++, rit++) {
-            if (lit->word() != rit->word()) return false;
+struct std::equal_to<const Words *> {
+    bool operator()(const Words *lhs, const Words *rhs) const {
+        if (lhs->size() != rhs->size()) { return false; }
+        for (auto lit = lhs->cbegin(), rit = rhs->cbegin(); lit != lhs->end(); lit++, rit++) {
+            if (lit->word() != rit->word()) { return false; }
         }
         return true;
     }
@@ -33,7 +33,7 @@ struct std::equal_to<Words> {
 class StateCache {
 public:
     typedef std::shared_ptr<StateCache> ptr;
-    typedef std::unordered_map<Words, std::shared_ptr<State>> map;
+    typedef std::unordered_map<const Words *, std::shared_ptr<State>> map;
     typedef map::iterator iterator;
 
     inline StateCache()
@@ -43,15 +43,14 @@ public:
         , mHitsSinceLastReport(0)
         , mMissesSinceLastReport(0)
         , mInsertsSinceLastReport(0) { }
-    static ptr unserialize(ptr &cache, std::istream &is);
+    static ptr unserialize(ptr &init, std::istream &is);
+    static ptr restore(ptr &init);
 
-    bool contains(const Words &key) const;
-    std::shared_ptr<State> at(const Words &key);
-    std::pair<iterator, bool> insert(const Words &key, std::shared_ptr<State> value);
+    bool contains(const Words *key) const;
+    std::shared_ptr<State> at(const Words *key);
+    std::pair<iterator, bool> insert(std::shared_ptr<State> value);
 
-    std::shared_ptr<State> initial_state() const {
-        return mInitialState;
-    }
+    std::shared_ptr<State> initial_state() const { return mInitialState; }
 
     inline void reset_stats() {
         mTotalHits = 0;
@@ -63,6 +62,7 @@ public:
     }
     std::string report();
 
+    void persist() const;
     void serialize(std::ostream &os) const;
 
 private:
