@@ -7,6 +7,7 @@ wordle-solver: $(src:%.cpp=%.o)
 
 state-compute: $(src:%.cpp=%.o)
 
+test: match.o
 
 .PHONY: depend
 depend:
@@ -14,7 +15,7 @@ depend:
 
 .PHONY: clean
 clean:
-	rm -f match.o state.o threadpool.o wordlist.o wordle-solver.o wordle-solver
+	rm -f $(src:%.cpp=%.o)
 
 # DO NOT DELETE
 
