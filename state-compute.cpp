@@ -8,6 +8,47 @@
 
 #include <fstream>
 
+namespace {
+void recurse(int level, const std::string &guess, const Keyboard &keyboard, const State::ptr &state, const StateCache::ptr &state_cache) {
+    for (std::size_t i = 0; i <= Match::kMaxValue; i++) {
+        //if (level == 2) {
+        //    auto fw = state->filtered_words_for_guess(guess, i);
+        //    if (state_cache->contains(&fw) && state_cache->at(&fw)->is_fully_computed()) continue;
+        //}
+
+        Match m(guess, i);
+        if (level == 0) {
+            for (std::size_t j = 0; j < level; j++) { std::cout << "  "; }
+            std::cout << "Considering guess \"" << guess << "\" with match " << m.toString() << std::endl;
+        }
+        auto t = state->consider_guess(guess, i);
+
+        auto l = keyboard.update_with_guess(guess, m);
+        auto e = t->best_guess(l);
+
+        if (t->n_solutions() == 1) continue;
+        if (level == 2) continue;
+
+        for (auto &se : e) {
+            recurse(level + 1, se.entropy().word().word(), l, t, state_cache);
+        }
+        if (level == 0 && (i+1)%10 == 0) {
+            std::cout << state_cache->report() << std::endl;
+
+            if (state_cache->dirty()) {
+                std::cout << "] " << std::flush;
+
+                std::string line;
+                std::getline(std::cin, line);
+            }
+
+            state_cache->persist();
+        }
+    }
+}
+
+} // namespace anonymous
+
 int main(void) {
     ThreadPool pool;
     StateCache::ptr state_cache(new StateCache);
@@ -22,46 +63,7 @@ int main(void) {
 
     Keyboard initial_keyboard;
 
-    for (std::size_t i = 0; i <= Match::kMaxValue; i++) {
-        Match m("trace", i);
-        std::cout << "Considering guess \"trace\" with match " << m.toString() << std::endl;
-        auto s = initial_state->consider_guess("trace", i);
-
-        if (s->n_solutions() == 1) continue;
-
-        auto k = initial_keyboard.update_with_guess("trace", m);
-        auto e = s->best_guess(k);
-
-        for (auto se : e) {
-            auto guess = se.entropy().word().word();
-            for (std::size_t j = 0; j <= Match::kMaxValue; j++) {
-                auto fw = s->filtered_words_for_guess(guess, j);
-                if (state_cache->contains(&fw) && state_cache->at(&fw)->is_fully_computed()) continue;
-
-                Match n(guess, j);
-                std::cout << "    Considering guess \"" << guess << "\" with match " << n.toString() << std::endl;
-                auto t = s->consider_guess(guess, j);
-
-                if (t->n_solutions() == 1) continue;
-                auto l = k.update_with_guess(guess, n);
-                auto f = t->best_guess(l);
-
-#if 0
-                if (f.size() == 0) continue;
-#endif
-            }
-        }
-        if ((i+1)%10 == 0) {
-            std::cout << state_cache->report() << std::endl;
-
-            std::cout << "] " << std::flush;
-
-            std::string line;
-            std::getline(std::cin, line);
-
-            state_cache->persist();
-        }
-    }
+    recurse(0, "trace", initial_keyboard, initial_state, state_cache);
 
     state_cache->persist();
     pool.done();
