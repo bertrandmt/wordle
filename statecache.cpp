@@ -16,7 +16,7 @@ bool StateCache::contains(const Words *key) const {
     return mCache.contains(key);
 }
 
-State::ptr StateCache::at(const Words *key) {
+State::ptr StateCache::at(const Words *key) const {
     std::shared_lock sl(mMutex);
 
     auto s = mCache.at(key);
@@ -43,6 +43,8 @@ std::pair<StateCache::iterator, bool> StateCache::insert(State::ptr value) {
 #endif // DEBUG_STATE_CACHE
     }
     else {
+        mDirty = true;
+
         if (!mInitialState.get()) {
             mInitialState = value;
         }
@@ -58,9 +60,10 @@ std::string StateCache::report() {
     std::size_t events_since_last_report = mHitsSinceLastReport + mMissesSinceLastReport;
 
     std::size_t n_fully_computed = std::transform_reduce(mCache.begin(), mCache.end(), 0, std::plus<>(), [](auto &entry) -> std::size_t { if (entry.second->is_fully_computed()) return 1; else return 0; });
+    std::size_t total_entropy_entries = std::transform_reduce(mCache.begin(), mCache.end(), 0, std::plus<>(), [](auto &entry) -> std::size_t { return entry.second->n_entropies(); });
 
     std::stringstream ss;
-    ss << "E:" << mCache.size() << "(F:" << n_fully_computed << ")" << std::endl
+    ss << "E:" << mCache.size() << "(F:" << n_fully_computed << ")(avg " << (total_entropy_entries * 1.) / mCache.size() << " h/s)" << std::endl
        << "T:H:" << mTotalHits           << "|M:" << mTotalMisses           << "|I:" << mTotalInserts           << " / " << total_events << std::endl
        << "S:H:" << mHitsSinceLastReport << "|M:" << mMissesSinceLastReport << "|I:" << mInsertsSinceLastReport << " / " << events_since_last_report;
 
@@ -79,9 +82,13 @@ void StateCache::serialize(std::ostream &os) const {
             }
             cache_entry.second->serialize(os);
         });
+
+    mDirty = false;
 }
 
 void StateCache::persist() const {
+    if (!mDirty) return;
+
     std::cout << "Persisting state cache..." << std::flush;
 
     std::ofstream ofs;
@@ -102,6 +109,8 @@ StateCache::ptr StateCache::unserialize(StateCache::ptr &init, std::istream &is)
         auto p = init->insert(state);
         assert(p.second);
     }
+
+    init->mDirty = false;
 
     return init;
 }

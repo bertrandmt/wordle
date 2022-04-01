@@ -42,12 +42,13 @@ public:
         , mTotalInserts(0)
         , mHitsSinceLastReport(0)
         , mMissesSinceLastReport(0)
-        , mInsertsSinceLastReport(0) { }
+        , mInsertsSinceLastReport(0)
+        , mDirty(false) { }
     static ptr unserialize(ptr &init, std::istream &is);
     static ptr restore(ptr &init);
 
     bool contains(const Words *key) const;
-    std::shared_ptr<State> at(const Words *key);
+    std::shared_ptr<State> at(const Words *key) const;
     std::pair<iterator, bool> insert(std::shared_ptr<State> value);
 
     std::shared_ptr<State> initial_state() const { return mInitialState; }
@@ -75,10 +76,12 @@ private:
     std::shared_ptr<State> mInitialState;
 
     mutable std::size_t mTotalHits;
-    mutable std::size_t mTotalMisses;
-    mutable std::size_t mTotalInserts;
+    std::size_t mTotalMisses;
+    std::size_t mTotalInserts;
 
     mutable std::size_t mHitsSinceLastReport;
-    mutable std::size_t mMissesSinceLastReport;
-    mutable std::size_t mInsertsSinceLastReport;
+    std::size_t mMissesSinceLastReport;
+    std::size_t mInsertsSinceLastReport;
+
+    mutable bool mDirty;
 };
