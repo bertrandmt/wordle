@@ -66,6 +66,8 @@ public:
     void persist() const;
     void serialize(std::ostream &os) const;
 
+    void make_dirty() { mDirty = true; }
+
 private:
     inline void set_cache(const map &cache) {
         mCache = cache;
