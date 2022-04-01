@@ -53,6 +53,11 @@ struct GameState {
             return;
         }
 
+        if (state->n_solutions() == 2) {
+            std::cout << ">>>>> SOLUTION ONE OF: " << state->solutions().at(0) << ", " << state->solutions().at(1) << " <<<<<" << std::endl;
+            return;
+        }
+
         auto best_guesses = state->best_guess(keyboard);
         if (best_guesses.size() == 0) {
             std::cout << "No solution left 😭" << std::endl;
