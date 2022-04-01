@@ -28,30 +28,38 @@ int main(void) {
         auto s = initial_state->consider_guess("trace", i);
 
         if (s->n_solutions() == 1) continue;
-        auto k = initial_keyboard.updateWithGuess("trace", m);
-        std::cout << state_cache->report() << std::endl;
 
+        auto k = initial_keyboard.update_with_guess("trace", m);
         auto e = s->best_guess(k);
-
-        if (e.size() == 0) continue;
 
         for (auto se : e) {
             auto guess = se.entropy().word().word();
             for (std::size_t j = 0; j <= Match::kMaxValue; j++) {
                 auto fw = s->filtered_words_for_guess(guess, j);
                 if (state_cache->contains(&fw) && state_cache->at(&fw)->is_fully_computed()) continue;
-    
+
                 Match n(guess, j);
-                std::cout << "  Considering guess \"" << guess << "\" with match " << n.toString() << std::endl;
+                std::cout << "    Considering guess \"" << guess << "\" with match " << n.toString() << std::endl;
                 auto t = s->consider_guess(guess, j);
-#if 0
+
                 if (t->n_solutions() == 1) continue;
-                auto l = k.updateWithGuess(guess, n);
-    
+                auto l = k.update_with_guess(guess, n);
                 auto f = t->best_guess(l);
-                if (e.size() == 0) continue;
+
+#if 0
+                if (f.size() == 0) continue;
 #endif
             }
+        }
+        if ((i+1)%10 == 0) {
+            std::cout << state_cache->report() << std::endl;
+
+            std::cout << "] " << std::flush;
+
+            std::string line;
+            std::getline(std::cin, line);
+
+            state_cache->persist();
         }
     }
 

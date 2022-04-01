@@ -7,6 +7,7 @@
 #include <iostream>
 
 Keyboard::Keyboard() {
+    mLetters.reserve(26);
     mLetters.push_back(Letter('q'));
     mLetters.push_back(Letter('w'));
     mLetters.push_back(Letter('e'));
@@ -35,8 +36,10 @@ Keyboard::Keyboard() {
     mLetters.push_back(Letter('m'));
 }
 
-Keyboard Keyboard::updateWithGuess(const std::string &guess, const Match &match) const {
+Keyboard Keyboard::update_with_guess(const std::string &guess, const Match &match) const {
     std::vector<const Letter> updated_keyboard;
+    updated_keyboard.reserve(mLetters.size());
+
     for (auto letter : mLetters) {
         auto ofs = guess.find(letter.value());
         if (ofs == std::string::npos) {

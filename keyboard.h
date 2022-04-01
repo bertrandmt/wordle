@@ -45,7 +45,7 @@ public:
     inline Keyboard(const Keyboard &other)
         : mLetters(other.mLetters) { }
 
-    Keyboard updateWithGuess(const std::string &guess, const Match &match) const;
+    Keyboard update_with_guess(const std::string &guess, const Match &match) const;
     const Letter &letter(char c) const;
     void print() const;
 

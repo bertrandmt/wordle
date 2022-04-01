@@ -254,7 +254,7 @@ int main(void) {
                 auto p = current_game_states[i].back();
                 std::cout << "Considering guess \"" << guess << "\" with match " << m.toString() << std::endl;
                 auto s = p.state->consider_guess(guess, m.value());
-                auto k = p.keyboard.updateWithGuess(guess, m);
+                auto k = p.keyboard.update_with_guess(guess, m);
                 GameState gs(p.generation + 1, s, k);
                 gs.serialize(std::cout);
                 current_game_states[i].push_back(gs);
