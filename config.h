@@ -12,3 +12,4 @@
 #define ENTROPY_2_TOP_N         (1000)
 #define MAX_N_SOLUTIONS_PRINTED (12)
 #define MAX_N_GUESSES_PRINTED   (10)
+#define ENTROPY_RATIO           (0.9)

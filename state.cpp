@@ -67,60 +67,31 @@ State::State(ThreadPool &pool, const StateCache::ptr &state_cache, const Words &
     , mSolutions(extract_solutions(mNSolutions, mWords))
     , mFullyComputed(false) { }
 
-void State::compute_real_entropy() const {
+void State::compute_entropy2() const {
+#if DEBUG_ENTROPY
+    std::cout << "Computing entropy..." << std::flush;
+#endif // DEBUG_ENTROPY
+
+    /* 3. compute entropy2 */
     std::mutex lock;
     int ndone = 0;
     std::condition_variable cond;
 
+    mEntropy2 = std::vector<WordEntropy>();
     const size_t num_blocks = mPool.num_threads();
-
-#if DEBUG_ENTROPY
-    std::cout << "Computing entropy..." << std::flush;
-#endif // DEBUG_ENTROPY
-    mEntropy.resize(mAllWords.size());
-    size_t block_sz = mEntropy.size() / num_blocks + 1;
-
-    /* 1. compute entropy */
-    for (auto i = 0; i < num_blocks; i++) {
-        mPool.push([i, block_sz, this, &lock, &ndone, &cond]() {
-                for (auto j = i * block_sz; j < (i+1) * block_sz && j < mEntropy.size(); j++) {
-                    const Word &word = mAllWords.at(j);
-                    mEntropy.at(j) = WordEntropy(word, compute_entropy_of(word.word()));
-                }
-                {
-                    std::lock_guard<std::mutex> lk(lock);
-                    ndone += 1;
-#if DEBUG_ENTROPY
-                    std::cout << "." << std::flush;
-#endif // DEBUG_ENTROPY
-                }
-                cond.notify_all();
-            });
-    }
-    {
-        std::unique_lock<std::mutex> lk(lock);
-        cond.wait(lk, [&ndone, num_blocks]() { return ndone == num_blocks; });
-    }
-
-    /* 2. sort entropy decreasing */
-    std::sort(mEntropy.begin(), mEntropy.end());
-
-    mMaxEntropy = mEntropy.at(0).entropy();
-
-    /* 3. compute entropy2 */
-    mEntropy2.resize(ENTROPY_2_TOP_N);
-    block_sz = mEntropy2.size() / num_blocks + 1;
+    const size_t block_sz = ENTROPY_2_TOP_N / num_blocks + 1;
     ndone = 0;
 
     for (auto i = 0; i < num_blocks; i++) {
         mPool.push([i, block_sz, this, &lock, &ndone, &cond]() {
-                for (auto j = i * block_sz; j < (i+1) * block_sz && j < mEntropy2.size(); j++) {
-                    const Word &word = mEntropy.at(j).word();
-                    uint32_t h = mEntropy.at(j).entropy();
-                    mEntropy2.at(j) = WordEntropy(word, h + compute_entropy2_of(word.word()));
+                std::vector<WordEntropy> block_entropy;
+                for (auto j = i * block_sz; j < (i+1) * block_sz && j < ENTROPY_2_TOP_N && j < mEntropy.size(); j++) {
+                    const WordEntropy &we = mEntropy.at(j);
+                    block_entropy.push_back(WordEntropy(we.word(), we.entropy() + compute_entropy2_of(we.word().word())));
                 }
                 {
                     std::lock_guard<std::mutex> lk(lock);
+                    mEntropy2.insert(mEntropy2.end(), block_entropy.begin(), block_entropy.end());
                     ndone += 1;
 #if DEBUG_ENTROPY
                     std::cout << "." << std::flush;
@@ -160,15 +131,82 @@ State::State(const State &other, const Words &filtered_words, bool do_full_compu
     , mMaxEntropy(0)
     , mFullyComputed(do_full_compute) {
 
+    /* 1. compute entropy */
     if (do_full_compute) {
-        compute_real_entropy();
+        std::mutex lock;
+        int ndone = 0;
+        std::condition_variable cond;
+
+        mEntropy = std::vector<WordEntropy>();
+        const size_t num_blocks = mPool.num_threads();
+        const size_t block_sz = mAllWords.size() / num_blocks + 1;
+
+        for (auto i = 0; i < num_blocks; i++) {
+            mPool.push([i, block_sz, this, &lock, &ndone, &cond]() {
+                    std::vector<WordEntropy> block_entropy;
+                    uint32_t max_h = 0, threshold = 0;
+                    for (auto j = i * block_sz; j < (i+1) * block_sz && j < mAllWords.size(); j++) {
+                        const Word &word = mAllWords.at(j);
+                        auto h = compute_entropy_of(word.word());
+                        if (h > max_h) { max_h = h; threshold = max_h * ENTROPY_RATIO; }
+                        if (h >= threshold && h > 0) {
+                            block_entropy.push_back(WordEntropy(word, h));
+                        }
+                    }
+                    {
+                        std::lock_guard<std::mutex> lk(lock);
+                        mEntropy.insert(mEntropy.end(), block_entropy.begin(), block_entropy.end());
+                        ndone += 1;
+#if DEBUG_ENTROPY
+                        std::cout << "." << std::flush;
+#endif // DEBUG_ENTROPY
+                    }
+                    cond.notify_all();
+                });
+        }
+        {
+            std::unique_lock<std::mutex> lk(lock);
+            cond.wait(lk, [&ndone, num_blocks]() { return ndone == num_blocks; });
+        }
     }
     else {
-        // when in submode (not printing), run entropy only on _words_, not _all words_
-        std::transform(mWords.begin(), mWords.end(), std::back_inserter(mEntropy), [this](const Word &word) { return WordEntropy(word, compute_entropy_of(word.word())); });
+        uint32_t max_h = 0, threshold = 0;
+        for (auto &word : mAllWords) {
+            auto h = compute_entropy_of(word.word());
+            if (h > max_h) { max_h = h; threshold = max_h * ENTROPY_RATIO; }
+            if (h >= threshold && h > 0) {
+                mEntropy.push_back(WordEntropy(word, h));
+            }
+        }
+    }
 
-        mMaxEntropy = std::transform_reduce(mEntropy.begin(), mEntropy.end(), 0, [](uint32_t max_h, uint32_t h) { return std::max(h, max_h); },
-                                                                             [](const WordEntropy &e) -> uint32_t { return e.entropy(); });
+    /* 2. sort entropy decreasing */
+    std::sort(mEntropy.begin(), mEntropy.end());
+
+    if (mEntropy.size() > 0) {
+        mMaxEntropy = mEntropy.at(0).entropy();
+
+        /* ok, but we gotta prune some out */
+        const uint32_t threshold = mMaxEntropy * 0.9;
+#if DEBUG_ENTROPY
+        size_t n_removed = 0;
+#endif // DEBUG_ENTROPY
+        while (mEntropy.size() > 0 && mEntropy.back().entropy() < threshold) {
+            mEntropy.pop_back();
+#if DEBUG_ENTROPY
+            n_removed++;
+#endif // DEBUG_ENTROPY
+        }
+#if DEBUG_ENTROPY
+        std::cout << "Purged " << n_removed << " entropy entries with threshold too low; down to " << mEntropy.size() << " entries." << std::endl;
+#endif // DEBUG_ENTROPY
+    }
+    else {
+        mMaxEntropy = 0;
+    }
+
+    if (do_full_compute) {
+        compute_entropy2();
     }
 }
 
@@ -207,8 +245,10 @@ State::ptr State::consider_guess(const std::string &guess, uint32_t match, bool 
 #endif // DEBUG_STATE_CACHE
 
         State::ptr s(new State(*this, filtered_words, do_full_compute));
-        auto jt = mStateCache->insert(s);
-        return jt.first->second;
+        if (s->n_solutions() != 0) {
+            mStateCache->insert(s);
+        }
+        return s;
     }
 }
 
@@ -293,7 +333,7 @@ std::vector<ScoredEntropy> State::best_guess(const Keyboard &keyboard) const {
     }
 
     if (!mFullyComputed) {
-        compute_real_entropy();
+        compute_entropy2();
     }
 
     std::vector<ScoredEntropy> scored_entropy;
