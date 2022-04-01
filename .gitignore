@@ -35,4 +35,4 @@ wordle-solver
 state-compute
 wordle.txt
 wordle_state_cache.txt
-Makefile.bak
+*.bak
