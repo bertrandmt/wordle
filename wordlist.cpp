@@ -1016,6 +1016,7 @@ namespace {
 
 Words assemble_all_words() {
     Words all_words;
+    all_words.reserve(solutions.size() + allowed.size());
     for (auto w : solutions) {
         all_words.push_back(Word(w, true));
     }

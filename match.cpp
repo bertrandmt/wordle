@@ -25,6 +25,7 @@ Match::Match(const std::string &guess, const std::string &solution)
 #endif
 
     std::vector<Value> solution_match(solution.size(), kAbsent);
+    solution_match.reserve(guess.size());
     // pass 1: considering each guess letter for correctness
     for (auto i = 0; i < guess.size(); i++) {
 #if DEBUG_MATCH
