@@ -236,6 +236,7 @@ bool subroutine(ThreadPool &pool, std::mutex &mutex, std::condition_variable &co
     std::cout << "] " << std::flush;
     std::getline(std::cin, line);
     if (!std::cin) {
+        std::cout << std::endl;
         done = true;
         return done;
     }
@@ -263,6 +264,11 @@ bool subroutine(ThreadPool &pool, std::mutex &mutex, std::condition_variable &co
         case '%': // change number of concurrent games
             std::cout << "% SWITCHING TO " << game_states.next_game() << " CONCURRENT GAMES" << std::endl;
             game_states.switch_game();
+            return done;
+
+        case '*': // persist!
+            std::cout << "* PERSISTING CACHE" << std::endl;
+            state_cache->persist();
             return done;
 
         case '?': { // what is the entropy of the word?
