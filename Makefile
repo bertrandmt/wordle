@@ -1,5 +1,6 @@
 CPPFLAGS=-std=c++2a -Wall -O3 -Wsign-compare -Werror -Werror=return-type # -g
 CC=$(CXX)
+LDLIBS=-lpthread
 
 src = keyboard.cpp match.cpp state.cpp statecache.cpp threadpool.cpp wordlist.cpp
 
