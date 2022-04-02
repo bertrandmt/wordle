@@ -182,7 +182,7 @@ public:
     }
 
     void process_guess(const std::string &guess, const std::vector<std::string> &matches) {
-        if (matches.size() != mCurrentGame) {
+        if (matches.size() != static_cast<std::size_t>(mCurrentGame)) {
             help();
             return;
         }

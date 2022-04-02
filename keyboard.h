@@ -2,6 +2,7 @@
 // See LICENSE for details of BSD 3-Clause License
 #pragma once
 
+#include <string>
 #include <vector>
 
 class Match;

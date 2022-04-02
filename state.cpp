@@ -74,7 +74,7 @@ void State::compute_entropy2() const {
 
     /* 3. compute entropy2 */
     std::mutex lock;
-    int ndone = 0;
+    unsigned ndone = 0;
     std::condition_variable cond;
 
     mEntropy2 = std::vector<WordEntropy>();
@@ -82,7 +82,7 @@ void State::compute_entropy2() const {
     const size_t block_sz = ENTROPY_2_TOP_N / num_blocks + 1;
     ndone = 0;
 
-    for (auto i = 0; i < num_blocks; i++) {
+    for (size_t i = 0; i < num_blocks; i++) {
         mPool.push([i, block_sz, this, &lock, &ndone, &cond]() {
                 std::vector<WordEntropy> block_entropy;
                 block_entropy.reserve(block_sz);
@@ -138,14 +138,14 @@ State::State(const State &other, const Words &filtered_words, bool do_full_compu
     if (mNSolutions > 2) {
         if (do_full_compute) {
             std::mutex lock;
-            int ndone = 0;
+            unsigned ndone = 0;
             std::condition_variable cond;
 
             mEntropy = std::vector<WordEntropy>();
             const size_t num_blocks = mPool.num_threads();
             const size_t block_sz = mAllWords.size() / num_blocks + 1;
 
-            for (auto i = 0; i < num_blocks; i++) {
+            for (size_t i = 0; i < num_blocks; i++) {
                 mPool.push([i, block_sz, this, &lock, &ndone, &cond]() {
                         std::vector<WordEntropy> block_entropy;
                         uint32_t max_h = 0, threshold = 0;
@@ -288,7 +288,7 @@ uint32_t State::compute_entropy2_of(const std::string &word) const {
     }
 
     double H = 0;
-    for (auto match = 0; match < match_counts.size(); match++) {
+    for (unsigned match = 0; match < match_counts.size(); match++) {
         if (match_counts[match] == 0) continue;
 
         auto s = consider_guess(word, match, false);
