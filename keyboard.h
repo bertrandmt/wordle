@@ -50,8 +50,8 @@ public:
     void print() const;
 
 private:
-    inline Keyboard(const std::vector<const Letter> &letters)
+    inline Keyboard(const std::vector<Letter> &letters)
         :mLetters(letters) { }
 
-    std::vector<const Letter> mLetters;
+    const std::vector<Letter> mLetters;
 };

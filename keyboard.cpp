@@ -6,38 +6,47 @@
 
 #include <iostream>
 
-Keyboard::Keyboard() {
-    mLetters.reserve(26);
-    mLetters.push_back(Letter('q'));
-    mLetters.push_back(Letter('w'));
-    mLetters.push_back(Letter('e'));
-    mLetters.push_back(Letter('r'));
-    mLetters.push_back(Letter('t'));
-    mLetters.push_back(Letter('y'));
-    mLetters.push_back(Letter('u'));
-    mLetters.push_back(Letter('i'));
-    mLetters.push_back(Letter('o'));
-    mLetters.push_back(Letter('p'));
-    mLetters.push_back(Letter('a'));
-    mLetters.push_back(Letter('s'));
-    mLetters.push_back(Letter('d'));
-    mLetters.push_back(Letter('f'));
-    mLetters.push_back(Letter('g'));
-    mLetters.push_back(Letter('h'));
-    mLetters.push_back(Letter('j'));
-    mLetters.push_back(Letter('k'));
-    mLetters.push_back(Letter('l'));
-    mLetters.push_back(Letter('z'));
-    mLetters.push_back(Letter('x'));
-    mLetters.push_back(Letter('c'));
-    mLetters.push_back(Letter('v'));
-    mLetters.push_back(Letter('b'));
-    mLetters.push_back(Letter('n'));
-    mLetters.push_back(Letter('m'));
+namespace {
+std::vector<Letter> initial_keyboard() {
+    std::vector<Letter> letters;
+
+    letters.reserve(26);
+    letters.push_back(Letter('q'));
+    letters.push_back(Letter('w'));
+    letters.push_back(Letter('e'));
+    letters.push_back(Letter('r'));
+    letters.push_back(Letter('t'));
+    letters.push_back(Letter('y'));
+    letters.push_back(Letter('u'));
+    letters.push_back(Letter('i'));
+    letters.push_back(Letter('o'));
+    letters.push_back(Letter('p'));
+    letters.push_back(Letter('a'));
+    letters.push_back(Letter('s'));
+    letters.push_back(Letter('d'));
+    letters.push_back(Letter('f'));
+    letters.push_back(Letter('g'));
+    letters.push_back(Letter('h'));
+    letters.push_back(Letter('j'));
+    letters.push_back(Letter('k'));
+    letters.push_back(Letter('l'));
+    letters.push_back(Letter('z'));
+    letters.push_back(Letter('x'));
+    letters.push_back(Letter('c'));
+    letters.push_back(Letter('v'));
+    letters.push_back(Letter('b'));
+    letters.push_back(Letter('n'));
+    letters.push_back(Letter('m'));
+
+    return letters;
+}
 }
 
+Keyboard::Keyboard()
+    : mLetters(initial_keyboard()) { }
+
 Keyboard Keyboard::update_with_guess(const std::string &guess, const Match &match) const {
-    std::vector<const Letter> updated_keyboard;
+    std::vector<Letter> updated_keyboard;
     updated_keyboard.reserve(mLetters.size());
 
     for (auto letter : mLetters) {
