@@ -175,6 +175,8 @@ public:
             case kQuordleNStates: return kOctordleNStates;
             case kOctordleNStates: return kWordleNStates;
         }
+        assert(!"unreachable");
+        return kWordleNStates;
     }
 
     GameState &at(std::size_t i) const {

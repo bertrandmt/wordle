@@ -1,4 +1,4 @@
-CPPFLAGS=-std=c++2a -Wall -O3 -Wsign-compare -Werror # -g
+CPPFLAGS=-std=c++2a -Wall -O3 -Wsign-compare -Werror -Werror=return-type # -g
 CC=$(CXX)
 
 src = keyboard.cpp match.cpp state.cpp statecache.cpp threadpool.cpp wordlist.cpp
