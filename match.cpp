@@ -16,16 +16,18 @@ std::string kMatchValueString[] = {
 
 } // namespace anonymous
 
-Match::Match(const std::string &guess, const std::string &solution)
-    : mMatch(guess.size(), kAbsent) {
+Match::Match(const std::string &guess, const std::string &solution) {
+
+    for (auto i = 0; i < WORD_LEN; i++) mMatch[i] = kAbsent;
 
     assert(guess.size() == solution.size());
 #if DEBUG_MATCH
     std::cout << "\"" << guess << "\" | \"" << solution << "\"" << std::endl;
 #endif
 
-    std::vector<Value> solution_match(solution.size(), kAbsent);
-    solution_match.reserve(guess.size());
+    assert(WORD_LEN == solution.size());
+    Value solution_match[WORD_LEN] = { kAbsent };
+
     // pass 1: considering each guess letter for correctness
     for (std::size_t i = 0; i < guess.size(); i++) {
 #if DEBUG_MATCH
@@ -93,10 +95,9 @@ Match::Match(const std::string &guess, const std::string &solution)
     }
 }
 
-Match::Match(const std::string &guess, uint32_t match)
-    : mMatch(guess.size()) {
+Match::Match(const std::string &guess, uint32_t match) {
 
-    for (std::size_t i = 0; i < mMatch.size(); i++) {
+    for (auto i = 0; i < WORD_LEN; i++) {
         mMatch[i] = static_cast<Value>(match % 3);
         match /= 3;
     }
@@ -133,7 +134,7 @@ Match Match::fromString(const std::string &guess, const std::string match_string
 
 std::string Match::toString() const {
     std::string s;
-    for (std::size_t i = 0; i < mMatch.size(); i++) {
+    for (auto i = 0; i < WORD_LEN; i++) {
         switch (mMatch[i]) {
             case kCorrect:
                 s.append(reinterpret_cast<const char *>(u8"🟩"));
@@ -155,7 +156,7 @@ std::string Match::toString() const {
 uint32_t Match::value() const {
     uint32_t value = 0;
     uint32_t exponent = 1;
-    for (std::size_t i = 0; i < mMatch.size(); i++) {
+    for (auto i = 0; i < WORD_LEN; i++) {
         value += mMatch[i] * exponent;
         exponent *= 3;
     }

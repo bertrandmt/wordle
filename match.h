@@ -24,14 +24,10 @@ public:
     uint32_t value() const;
 
     inline Value value_at(size_t i) const {
-        auto it = mMatch.begin();
-        std::advance(it, i);
-        if (it == mMatch.end()) {
-            return kAbsent;
-        }
-        return *it;
+        if (i < 0 || i >= WORD_LEN) return kAbsent;
+        return mMatch[i];
     }
 
 private:
-    std::vector<Value> mMatch;
+    Value mMatch[WORD_LEN];
 };

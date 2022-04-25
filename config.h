@@ -13,3 +13,5 @@
 #define MAX_N_SOLUTIONS_PRINTED (12)
 #define MAX_N_GUESSES_PRINTED   (10)
 #define ENTROPY_RATIO           (0.9)
+
+#define WORD_LEN                (5)
