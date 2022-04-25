@@ -33,6 +33,7 @@
 
 wordle-solver
 state-compute
+test
 wordle.txt
-wordle_state_cache.txt
+wordle_state_cache.bin
 *.bak

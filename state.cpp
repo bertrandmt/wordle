@@ -358,14 +358,24 @@ std::vector<ScoredEntropy> State::best_guess(const Keyboard &keyboard) const {
 }
 
 void State::serialize(std::ostream & os) const {
-    os << mFullyComputed << " "
-       << mWords.size() << " ";
-    std::for_each(mWords.begin(), mWords.end(), [&os](const Word &w) { w.serialize(os); os << " "; });
-    os << mEntropy.size() << " ";
-    std::for_each(mEntropy.begin(), mEntropy.end(), [&os](const WordEntropy &e) { e.serialize(os); os << " "; });
+    os.put(mFullyComputed);
+
+    assert(mWords.size() <= std::numeric_limits<uint32_t>::max());
+    uint32_t sz = mWords.size();
+    os.write(reinterpret_cast<char *>(&sz), sizeof sz);
+
+    std::for_each(mWords.begin(), mWords.end(), [&os](const Word &w) { w.serialize(os); });
+
+    sz = mEntropy.size();
+    os.write(reinterpret_cast<char *>(&sz), sizeof sz);
+
+    std::for_each(mEntropy.begin(), mEntropy.end(), [&os](const WordEntropy &e) { e.serialize(os); });
+
     if (mFullyComputed) {
-        os << mEntropy2.size() << " ";
-        std::for_each(mEntropy2.begin(), mEntropy2.end(), [&os](const WordEntropy &e) { e.serialize(os); os << " "; });
+        sz = mEntropy2.size();
+        os.write(reinterpret_cast<char *>(&sz), sizeof sz);
+
+        std::for_each(mEntropy2.begin(), mEntropy2.end(), [&os](const WordEntropy &e) { e.serialize(os); });
     }
 }
 
@@ -392,23 +402,26 @@ State::State(const State::ptr &other, const Words &words, const std::vector<Word
 }
 
 State::ptr State::unserialize(std::istream &is, const StateCache::ptr &cache) {
-    bool fully_computed = false;
-    std::size_t n_words = 0;
 
-    is >> fully_computed >> n_words;
+    char fully_computed_c;
+    is.get(fully_computed_c);
+    bool fully_computed = static_cast<bool>(fully_computed_c);
+
+    uint32_t n_words = 0;
+    is.read(reinterpret_cast<char *>(&n_words), sizeof n_words);
 
     Words words;
     words.reserve(n_words);
-    for (std::size_t i = 0; i < n_words; i++) {
+    for (size_t i = 0; i < n_words; i++) {
         words.push_back(Word::unserialize(is));
     }
 
-    std::size_t n_entropy;
-    is >> n_entropy;
+    uint32_t n_entropy;
+    is.read(reinterpret_cast<char *>(&n_entropy), sizeof n_entropy);
 
     std::vector<WordEntropy> entropy;
     entropy.reserve(n_entropy);
-    for (std::size_t i = 0; i < n_entropy; i++) {
+    for (size_t i = 0; i < n_entropy; i++) {
         WordEntropy e = WordEntropy::unserialize(is);
         if (e.entropy() == 0) continue;
         entropy.push_back(e);
@@ -416,11 +429,11 @@ State::ptr State::unserialize(std::istream &is, const StateCache::ptr &cache) {
 
     std::vector<WordEntropy> entropy2;
     if (fully_computed) {
-        std::size_t n_entropy2;
-        is >> n_entropy2;
+        uint32_t n_entropy2;
+        is.read(reinterpret_cast<char *>(&n_entropy2), sizeof n_entropy2);
 
         entropy2.reserve(n_entropy2);
-        for (std::size_t i = 0; i < n_entropy2; i++) {
+        for (size_t i = 0; i < n_entropy2; i++) {
             WordEntropy e = WordEntropy::unserialize(is);
             if (e.entropy() == 0) continue;
             entropy2.push_back(e);

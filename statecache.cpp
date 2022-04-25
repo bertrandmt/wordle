@@ -75,7 +75,10 @@ std::string StateCache::report() {
 }
 
 void StateCache::serialize(std::ostream &os) const {
-    os << mCache.size() - 1 << " ";
+    assert(mCache.size() <= std::numeric_limits<uint32_t>::max());
+    uint32_t sz = mCache.size() - 1;
+    os.write(reinterpret_cast<char *>(&sz), sizeof sz);
+
     std::for_each(mCache.begin(), mCache.end(), [&os, this](const auto &cache_entry) {
             if (cache_entry.second == mInitialState) { // skip initial state
                 return;
@@ -92,7 +95,7 @@ void StateCache::persist() const {
     std::cout << "Persisting state cache..." << std::flush;
 
     std::ofstream ofs;
-    ofs.open("wordle_state_cache.txt", std::ofstream::trunc);
+    ofs.open("wordle_state_cache.bin", std::ofstream::trunc|std::ofstream::binary);
 
     serialize(ofs);
 
@@ -101,8 +104,8 @@ void StateCache::persist() const {
 }
 
 StateCache::ptr StateCache::unserialize(StateCache::ptr &init, std::istream &is) {
-    std::size_t n_states;
-    is >> n_states;
+    uint32_t n_states;
+    is.read(reinterpret_cast<char *>(&n_states), sizeof n_states);
 
     for (size_t i = 0; i < n_states; i++) {
         State::ptr state = State::unserialize(is, init);
@@ -119,7 +122,7 @@ StateCache::ptr StateCache::restore(StateCache::ptr &init) {
     std::cout << "Loading state cache..." << std::flush;
 
     std::ifstream ifs;
-    ifs.open("wordle_state_cache.txt");
+    ifs.open("wordle_state_cache.bin", std::ifstream::binary);
     if (ifs.fail()) {
         std::cout << " failed: initializing from scratch" << std::endl;
         return init;

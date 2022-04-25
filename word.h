@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <string>
+#include <limits>
 
 class Keyboard;
 
@@ -26,16 +27,24 @@ public:
     }
 
     inline void serialize(std::ostream &os) const {
-        os << mIsSolution << " " << mWord.size() << mWord ;
+        os.put(mIsSolution);
+
+        assert(mWord.size() <= std::numeric_limits<char>::max());
+        os.put(static_cast<char>(mWord.size()));
+
+        os.write(&mWord[0], mWord.size());
     }
 
     static inline Word unserialize(std::istream &is) {
-        bool is_solution;
-        std::size_t word_len;
+        char is_solution_c;
+        is.get(is_solution_c);
+        bool is_solution = static_cast<bool>(is_solution_c);
 
-        is >> is_solution >> word_len;
+        char word_len_c;
+        is.get(word_len_c);
+        size_t word_len = word_len_c;
 
-        if (word_len != 5) {
+        if (word_len != WORD_LEN) {
             throw new std::runtime_error("bad string size value");
         }
 
@@ -84,14 +93,15 @@ public:
 
     inline void serialize(std::ostream &os) const {
         mWord.serialize(os);
-        os << " " << mEntropy;
+
+        os.write(reinterpret_cast<const char *>(&mEntropy), sizeof mEntropy);
     }
 
     static inline WordEntropy unserialize(std::istream &is) {
         Word word = Word::unserialize(is);
 
         uint32_t entropy;
-        is >> entropy;
+        is.read(reinterpret_cast<char *>(&entropy), sizeof entropy);
 
         return WordEntropy(word, entropy);
     }
