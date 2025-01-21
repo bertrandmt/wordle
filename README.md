@@ -5,17 +5,17 @@
 
 ```
 $ ./wordle-solver
-State[gen#1]: 2315 solutions and 12960 words.
-⬜️q ⬜️w ⬜️e ⬜️r ⬜️t ⬜️y ⬜️u ⬜️i ⬜️o ⬜️p
-  ⬜️a ⬜️s ⬜️d ⬜️f ⬜️g ⬜️h ⬜️j ⬜️k ⬜️l
-     ⬜️z ⬜️x ⬜️c ⬜️v ⬜️b ⬜️n ⬜️m 
+Loading state cache... done
+State[gen:1]: S:2315|W:12960
 Initial best guess is "trace".
 ] 
 ```
 
 At the prompt (`]`), enter a guess and its outcome as reported by Wordle. The solver recommends `trace` as the initial guess, though the user is free to choose any starting word it cares.
 
-For Wordle #268 (Monday 2022-03-14), let's try `aiery` as the initial guess. World reports the `E` being 🟩 with all other letters (`A`, `I`, `R` and `Y`) being ⬜️.
+The state of the solver evolves linearly in "generations". The current generation of the state is represented by the string `State[gen:1]: S:2315|W:12960` which indicateds that at initial generation number 1, there are 2315 possible solutions for 12960 possible words.
+
+For Wordle #268 (Monday 2022-03-14), let's try `aiery` as the initial guess. Wordle reports the `E` being 🟩 with all other letters (`A`, `I`, `R` and `Y`) being ⬜️.
 
 The syntax to tell as much to `wordle-solver` is in the form `guess;match`, with match a series of letters indicating the outcome.
 
@@ -30,12 +30,8 @@ For our example, we'd enter `aiery;aacaa`. `world-solver` immediately proceeds t
 ```
 ] aiery;aacaa
 Considering guess "aiery" with match ⬜️⬜️🟩⬜️⬜️
-State[gen#2]: 64 solutions and 352 words.
-⬜️q ⬜️w 🟨e ⬛️r ⬜️t ⬛️y ⬜️u ⬛️i ⬜️o ⬜️p
-  ⬛️a ⬜️s ⬜️d ⬜️f ⬜️g ⬜️h ⬜️j ⬜️k ⬜️l
-     ⬜️z ⬜️x ⬜️c ⬜️v ⬜️b ⬜️n ⬜️m 
-Computing entropy...................................
-Recommending guess "slump" out of 1 words ("slump") with highest two-level entropy 4.13722 and highest score 15.
+State[gen:2]: S:64|W:352
+[H=4.093|S=13] "slept"
 ] 
 ```
 
@@ -43,32 +39,21 @@ Again, the user is not required to make use of the recommendation (though, then,
 
 As is reported, the space of solutions at the 2nd generation has shrunk from 12960 words and 2315 possible solutions, down to 352 words and only 64 possible solutions.
 
+The next best guess, `slept` is recommended, having a score of 13 for an entropy of 4.093 (that is: making use of this guess will provide just about 4 bits of entropy).
+
 As further entries are provided, the space of solutions goes down until there are few enough to print all of them, or there is just one.
 
 ```
 ] slump;cpapa
 Considering guess "slump" with match 🟩🟨⬜️🟨⬜️
-State[gen#3]: 2 solutions and 3 words.
-⬜️q ⬜️w 🟨e ⬛️r ⬜️t ⬛️y ⬛️u ⬛️i ⬜️o ⬛️p
-  ⬛️a 🟨s ⬜️d ⬜️f ⬜️g ⬜️h ⬜️j ⬜️k 🟨l
-     ⬜️z ⬜️x ⬜️c ⬜️v ⬜️b ⬜️n 🟨m 
-Computing entropy...................................
-Solutions and associated entropy:
-	"smelt": 0.693147
-	"smell": 0
-Recommending guess "wootz" out of 4 words ("wootz", "whoot", "tondo", "thoft") with highest two-level entropy 0.693147 and highest score 15.
+State[gen:3]: S:2|W:3
+>>>>> SOLUTION ONE OF: "smelt"[T], "smell"[T] <<<<<
 ] smell;cccca
 Considering guess "smell" with match 🟩🟩🟩🟩⬜️
-State[gen#4]: 1 solutions and 1 words.
-⬜️q ⬜️w 🟨e ⬛️r ⬜️t ⬛️y ⬛️u ⬛️i ⬜️o ⬛️p
-  ⬛️a 🟨s ⬜️d ⬜️f ⬜️g ⬜️h ⬜️j ⬜️k 🟨l
-     ⬜️z ⬜️x ⬜️c ⬜️v ⬜️b ⬜️n 🟨m 
-Computing entropy...................................
-THE solution: "smelt"
+State[gen:4]: S:1|W:1
+>>>>> THE SOLUTION: "smelt" <<<<<
 ] 
 ```
-
-The keen eye will notice that the recommendation at the 3rd generation is not useful in this example. `wordle-solver` is not perfect yet!
 
 Ultimately, there is only one solution left (`smelt`) and the solver indicates as much.
 
@@ -82,35 +67,18 @@ aiery;aacaa
 slump;cpapa
 smell;cccca
 $ ./wordle-solver < wordle.txt
-State[gen#1]: 2315 solutions and 12960 words.
-⬜️q ⬜️w ⬜️e ⬜️r ⬜️t ⬜️y ⬜️u ⬜️i ⬜️o ⬜️p
-  ⬜️a ⬜️s ⬜️d ⬜️f ⬜️g ⬜️h ⬜️j ⬜️k ⬜️l
-     ⬜️z ⬜️x ⬜️c ⬜️v ⬜️b ⬜️n ⬜️m 
+Loading state cache... done
+State[gen:1]: S:2315|W:12960
 Initial best guess is "trace".
 ] Considering guess "aiery" with match ⬜️⬜️🟩⬜️⬜️
-State[gen#2]: 64 solutions and 352 words.
-⬜️q ⬜️w 🟨e ⬛️r ⬜️t ⬛️y ⬜️u ⬛️i ⬜️o ⬜️p
-  ⬛️a ⬜️s ⬜️d ⬜️f ⬜️g ⬜️h ⬜️j ⬜️k ⬜️l
-     ⬜️z ⬜️x ⬜️c ⬜️v ⬜️b ⬜️n ⬜️m 
-Computing entropy...................................
-Recommending guess "slump" out of 1 words ("slump") with highest two-level entropy 4.13722 and highest score 15.
+State[gen:2]: S:64|W:352
+[H=4.093|S=13] "slept"
 ] Considering guess "slump" with match 🟩🟨⬜️🟨⬜️
-State[gen#3]: 2 solutions and 3 words.
-⬜️q ⬜️w 🟨e ⬛️r ⬜️t ⬛️y ⬛️u ⬛️i ⬜️o ⬛️p
-  ⬛️a 🟨s ⬜️d ⬜️f ⬜️g ⬜️h ⬜️j ⬜️k 🟨l
-     ⬜️z ⬜️x ⬜️c ⬜️v ⬜️b ⬜️n 🟨m 
-Computing entropy...................................
-Solutions and associated entropy:
-	"smelt": 0.693147
-	"smell": 0
-Recommending guess "wootz" out of 4 words ("wootz", "whoot", "tondo", "thoft") with highest two-level entropy 0.693147 and highest score 15.
+State[gen:3]: S:2|W:3
+>>>>> SOLUTION ONE OF: "smelt"[T], "smell"[T] <<<<<
 ] Considering guess "smell" with match 🟩🟩🟩🟩⬜️
-State[gen#4]: 1 solutions and 1 words.
-⬜️q ⬜️w 🟨e ⬛️r ⬜️t ⬛️y ⬛️u ⬛️i ⬜️o ⬛️p
-  ⬛️a 🟨s ⬜️d ⬜️f ⬜️g ⬜️h ⬜️j ⬜️k 🟨l
-     ⬜️z ⬜️x ⬜️c ⬜️v ⬜️b ⬜️n 🟨m 
-Computing entropy...................................
-THE solution: "smelt"
+State[gen:4]: S:1|W:1
+>>>>> THE SOLUTION: "smelt" <<<<<
 ] $
 ```
 
@@ -137,33 +105,21 @@ The syntax for the reset command is a lone `!` at the prompt.
 
 ```
 $ ./wordle-solver 
-State[gen#1]: 2315 solutions and 12960 words.
-⬜️q ⬜️w ⬜️e ⬜️r ⬜️t ⬜️y ⬜️u ⬜️i ⬜️o ⬜️p
-  ⬜️a ⬜️s ⬜️d ⬜️f ⬜️g ⬜️h ⬜️j ⬜️k ⬜️l
-     ⬜️z ⬜️x ⬜️c ⬜️v ⬜️b ⬜️n ⬜️m 
+Loading state cache... done
+State[gen:1]: S:2315|W:12960
 Initial best guess is "trace".
 ] aiery;aacaa
 Considering guess "aiery" with match ⬜️⬜️🟩⬜️⬜️
-State[gen#2]: 64 solutions and 352 words.
-⬜️q ⬜️w 🟨e ⬛️r ⬜️t ⬛️y ⬜️u ⬛️i ⬜️o ⬜️p
-  ⬛️a ⬜️s ⬜️d ⬜️f ⬜️g ⬜️h ⬜️j ⬜️k ⬜️l
-     ⬜️z ⬜️x ⬜️c ⬜️v ⬜️b ⬜️n ⬜️m 
-Computing entropy...................................
-Recommending guess "slump" out of 1 words ("slump") with highest two-level entropy 4.13722 and highest score 15.
+State[gen:2]: S:64|W:352
+[H=4.093|S=13] "slept"
 ] !
 # RESET!
-State[gen#1]: 2315 solutions and 12960 words.
-⬜️q ⬜️w ⬜️e ⬜️r ⬜️t ⬜️y ⬜️u ⬜️i ⬜️o ⬜️p
-  ⬜️a ⬜️s ⬜️d ⬜️f ⬜️g ⬜️h ⬜️j ⬜️k ⬜️l
-     ⬜️z ⬜️x ⬜️c ⬜️v ⬜️b ⬜️n ⬜️m 
+State[gen:1]: S:2315|W:12960
+Initial best guess is "trace".
 ] trace;paaap
 Considering guess "trace" with match 🟨⬜️⬜️⬜️🟨
-State[gen#2]: 58 solutions and 343 words.
-⬜️q ⬜️w 🟨e ⬛️r 🟨t ⬜️y ⬜️u ⬜️i ⬜️o ⬜️p
-  ⬛️a ⬜️s ⬜️d ⬜️f ⬜️g ⬜️h ⬜️j ⬜️k ⬜️l
-     ⬜️z ⬜️x ⬛️c ⬜️v ⬜️b ⬜️n ⬜️m 
-Computing entropy...................................
-Recommending guess "snipy" out of 6 words ("snipy", "ludos", "buhls", "ouphs", "gusli", "pushy") with highest two-level entropy 4.06044 and highest score 15.
+State[gen:2]: S:58|W:343
+[H=4.035|S=10] "ledes"
 ] 
 ```
 
@@ -173,56 +129,29 @@ The back command (`^`) is used to go "back" one generation.
 
 ```
 λ ./wordle-solver 
-State[gen#1]: 2315 solutions and 12960 words.
-⬜️q ⬜️w ⬜️e ⬜️r ⬜️t ⬜️y ⬜️u ⬜️i ⬜️o ⬜️p
-  ⬜️a ⬜️s ⬜️d ⬜️f ⬜️g ⬜️h ⬜️j ⬜️k ⬜️l
-     ⬜️z ⬜️x ⬜️c ⬜️v ⬜️b ⬜️n ⬜️m 
+Loading state cache... done
+State[gen:1]: S:2315|W:12960
 Initial best guess is "trace".
 ] aiery;aacaa
 Considering guess "aiery" with match ⬜️⬜️🟩⬜️⬜️
-State[gen#2]: 64 solutions and 352 words.
-⬜️q ⬜️w 🟨e ⬛️r ⬜️t ⬛️y ⬜️u ⬛️i ⬜️o ⬜️p
-  ⬛️a ⬜️s ⬜️d ⬜️f ⬜️g ⬜️h ⬜️j ⬜️k ⬜️l
-     ⬜️z ⬜️x ⬜️c ⬜️v ⬜️b ⬜️n ⬜️m 
-Computing entropy...................................
-Recommending guess "slump" out of 1 words ("slump") with highest two-level entropy 4.13722 and highest score 15.
+State[gen:2]: S:64|W:352
+[H=4.093|S=13] "slept"
 ] slump;cpapa
 Considering guess "slump" with match 🟩🟨⬜️🟨⬜️
-State[gen#3]: 2 solutions and 3 words.
-⬜️q ⬜️w 🟨e ⬛️r ⬜️t ⬛️y ⬛️u ⬛️i ⬜️o ⬛️p
-  ⬛️a 🟨s ⬜️d ⬜️f ⬜️g ⬜️h ⬜️j ⬜️k 🟨l
-     ⬜️z ⬜️x ⬜️c ⬜️v ⬜️b ⬜️n 🟨m 
-Computing entropy...................................
-Solutions and associated entropy:
-	"smelt": 0.693147
-	"smell": 0
-Recommending guess "thoft" out of 4 words ("wootz", "whoot", "tondo", "thoft") with highest two-level entropy 0.693147 and highest score 15.
+State[gen:3]: S:2|W:3
+>>>>> SOLUTION ONE OF: "smelt"[T], "smell"[T] <<<<<
 ] wootz;aaapa
 Considering guess "wootz" with match ⬜️⬜️⬜️🟨⬜️
-State[gen#4]: 1 solutions and 1 words.
-⬜️q ⬛️w 🟨e ⬛️r 🟨t ⬛️y ⬛️u ⬛️i ⬛️o ⬛️p
-  ⬛️a 🟨s ⬜️d ⬜️f ⬜️g ⬜️h ⬜️j ⬜️k 🟨l
-     ⬛️z ⬜️x ⬜️c ⬜️v ⬜️b ⬜️n 🟨m 
-Computing entropy...................................
-THE solution: "smelt"
+State[gen:4]: S:1|W:1
+>>>>> THE SOLUTION: "smelt" <<<<<
 ] ^
 ^ BACK ONE
-State[gen#3]: 2 solutions and 3 words.
-⬜️q ⬜️w 🟨e ⬛️r ⬜️t ⬛️y ⬛️u ⬛️i ⬜️o ⬛️p
-  ⬛️a 🟨s ⬜️d ⬜️f ⬜️g ⬜️h ⬜️j ⬜️k 🟨l
-     ⬜️z ⬜️x ⬜️c ⬜️v ⬜️b ⬜️n 🟨m 
-Solutions and associated entropy:
-	"smelt": 0.693147
-	"smell": 0
-Recommending guess "wootz" out of 4 words ("wootz", "whoot", "tondo", "thoft") with highest two-level entropy 0.693147 and highest score 15.
+State[gen:3]: S:2|W:3
+>>>>> SOLUTION ONE OF: "smelt"[T], "smell"[T] <<<<<
 ] whoot;aaaac
 Considering guess "whoot" with match ⬜️⬜️⬜️⬜️🟩
-State[gen#4]: 1 solutions and 1 words.
-⬜️q ⬛️w 🟨e ⬛️r 🟨t ⬛️y ⬛️u ⬛️i ⬛️o ⬛️p
-  ⬛️a 🟨s ⬜️d ⬜️f ⬜️g ⬛️h ⬜️j ⬜️k 🟨l
-     ⬜️z ⬜️x ⬜️c ⬜️v ⬜️b ⬜️n 🟨m 
-Computing entropy...................................
-THE solution: "smelt"
+State[gen:4]: S:1|W:1
+>>>>> THE SOLUTION: "smelt" <<<<<
 ] 
 ```
 
@@ -230,14 +159,12 @@ THE solution: "smelt"
 
 At any given state, the computed entropy of any given word can be queried. This is "lifting the curtain" a bit on the (otherwise not particularly useful) internal details of the solver, but since it's there, it might as well be used.
 
-```State[gen#2]: 64 solutions and 352 words.
-⬜️q ⬜️w 🟨e ⬛️r ⬜️t ⬛️y ⬜️u ⬛️i ⬜️o ⬜️p
-  ⬛️a ⬜️s ⬜️d ⬜️f ⬜️g ⬜️h ⬜️j ⬜️k ⬜️l
-     ⬜️z ⬜️x ⬜️c ⬜️v ⬜️b ⬜️n ⬜️m 
-Recommending guess "slump" out of 1 words ("slump") with highest two-level entropy 4.13722 and highest score 15.
-] ?smell
-[0] H("smell") = 2.31953
-[0]H2("smell") = 0
+```
+State[gen:2]: S:64|W:352
+[H=4.093|S=13] "slept"
+] ?slept
+[0] H("slept") = 3.157
+[0]H2("slept") = 4.093
 ```
 The output of the command is somewhat opaque. H is the entropy within the current state, while H2 is the two-level entropy. H2 can be 0 for some words as only the top-entropy words have their two-level entropy computed.
 
