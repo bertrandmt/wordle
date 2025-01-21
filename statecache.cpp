@@ -135,7 +135,9 @@ StateCache::ptr StateCache::restore(StateCache::ptr &init) {
     std::cout << " done" << std::endl;
 
     init->reset_stats();
+#if DEBUG_STATE_CACHE
     std::cout << init->report() << std::endl;
-
+#endif // DEBUG_STATE_CACHE
+    
     return init;
 }
