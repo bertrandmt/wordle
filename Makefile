@@ -1,3 +1,5 @@
+# Copyright (c) 2022-2025, Bertrand Mollinier Toublet
+# See LICENSE for details of BSD 3-Clause License
 CPPFLAGS=-std=c++2a -Wall -O3 -Wsign-compare -Werror -Werror=return-type # -g
 CC=$(CXX)
 LDLIBS=-lpthread
