@@ -297,9 +297,10 @@ bool subroutine(ThreadPool &pool, std::mutex &mutex, std::condition_variable &co
         ofs = ofs2;
     }
     game_states.process_guess(guess, matches);
-
+#if DEBUG_STATE_CACHE
     std::cout << state_cache->report() << std::endl;
-
+#endif // DEBUG_STATE_CACHE
+    
     return done;
 }
 
@@ -350,44 +351,3 @@ int main(void) {
 
     return 0;
 }
-
-
-#if 0
-    std::cout << Match("clump", "perch").toString() << std::endl;
-    std::cout << Match("perch", "clump").toString() << std::endl;
-    std::cout << Match("tuner", "exits").toString() << std::endl;
-    std::cout << Match("exits", "tuner").toString() << std::endl;
-    std::cout << Match("doozy", "yahoo").toString() << std::endl;
-    std::cout << Match("preen", "hyper").toString() << std::endl;
-    std::cout << Match("hyper", "upper").toString() << std::endl;
-    std::cout << Match("ulama", "offal").toString() << std::endl;
-    return 1;
-#endif
-#if 0
-    {
-        std::string input("1 5cigar");
-        std::istringstream is(input);
-        Word w = Word::unserialize(is);
-        w.serialize(std::cout);
-        std::cout << std::endl;
-    }
-    {
-        std::string input("1 5cigar 693");
-        std::istringstream is(input);
-        WordEntropy we = WordEntropy::unserialize(is);
-        we.serialize(std::cout);
-        std::cout << std::endl;
-    }
-    return 1;
-#endif
-
-#if 0
-    {
-        std::string input("0 4 1 5actor 0 5carts 0 5curat 0 5scrat 4 1 5actor 0 0 5carts 0 0 5curat 0 0 5scrat 0 ");
-        std::istringstream is(input);
-        State::ptr state = State::unserialize(is, initial_state);
-        state->serialize(std::cout);
-    }
-    pool.done();
-    return 1;
-#endif
