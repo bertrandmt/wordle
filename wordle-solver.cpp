@@ -276,8 +276,8 @@ bool subroutine(ThreadPool &pool, std::mutex &mutex, std::condition_variable &co
         case '?': { // what is the entropy of the word?
             std::string word = nowsline.substr(1);
             for (auto i = 0; i < game_states.current_game(); i++) {
-                std::cout << "[" << i << "] H(\"" << word << "\") = " << game_states.at(i).state->entropy_of(word) << std::endl;
-                std::cout << "[" << i << "]H2(\"" << word << "\") = " << game_states.at(i).state->entropy2_of(word) << std::endl;
+                std::cout << "[" << i << "] H(\"" << word << "\") = " << game_states.at(i).state->entropy_of(word) / 1000. << std::endl;
+                std::cout << "[" << i << "]H2(\"" << word << "\") = " << game_states.at(i).state->entropy2_of(word) / 1000. << std::endl;
             }
             }
             return done;
