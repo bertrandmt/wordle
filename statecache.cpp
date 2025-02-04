@@ -5,6 +5,7 @@
 #include <iostream>
 #include <numeric>
 #include <sstream>
+#include <mutex>
 
 #include "config.h"
 #include "state.h"
@@ -138,6 +139,6 @@ StateCache::ptr StateCache::restore(StateCache::ptr &init) {
 #if DEBUG_STATE_CACHE
     std::cout << init->report() << std::endl;
 #endif // DEBUG_STATE_CACHE
-    
+
     return init;
 }
