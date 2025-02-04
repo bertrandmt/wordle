@@ -3,7 +3,8 @@
 #include "config.h"
 #include "wordlist.h"
 
-const std::vector<std::string> solutions = {
+#define N_SOLUTIONS (2315)
+const char * solutions[N_SOLUTIONS] = {
         "cigar", "rebut", "sissy", "humph", "awake", "blush", "focal", "evade", "naval", "serve", "heath", "dwarf", "model",
         "karma", "stink", "grade", "quiet", "bench", "abate", "feign", "major", "death", "fresh", "crust", "stool", "colon",
         "abase", "marry", "react", "batty", "pride", "floss", "helix", "croak", "staff", "paper", "unfed", "whelp", "trawl",
@@ -187,7 +188,8 @@ const std::vector<std::string> solutions = {
 #endif
 };
 
-const std::vector<std::string> allowed = {
+#define N_ALLOWED       (10645)
+const char *allowed[N_ALLOWED] = {
         "aahed", "aalii", "aargh", "aarti", "abaca", "abaci", "abacs", "abaft", "abaka", "abamp", "aband", "abash", "abask",
         "abaya", "abbas", "abbed", "abbes", "abcee", "abeam", "abear", "abele", "abers", "abets", "abies", "abler", "ables",
         "ablet", "ablow", "abmho", "abohm", "aboil", "aboma", "aboon", "abord", "abore", "abram", "abray", "abrim", "abrin",
@@ -1016,7 +1018,7 @@ namespace {
 
 Words assemble_all_words() {
     Words all_words;
-    all_words.reserve(solutions.size() + allowed.size());
+    all_words.reserve(N_SOLUTIONS + N_ALLOWED);
     for (auto w : solutions) {
         all_words.push_back(Word(w, true));
     }
