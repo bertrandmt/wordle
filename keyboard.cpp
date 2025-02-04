@@ -4,6 +4,7 @@
 #include "keyboard.h"
 #include "match.h"
 
+#include <algorithm>
 #include <cassert>
 #include <iostream>
 

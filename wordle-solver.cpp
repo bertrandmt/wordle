@@ -302,7 +302,7 @@ bool subroutine(ThreadPool &pool, std::mutex &mutex, std::condition_variable &co
 #if DEBUG_STATE_CACHE
     std::cout << state_cache->report() << std::endl;
 #endif // DEBUG_STATE_CACHE
- 
+
     return done;
 }
 
